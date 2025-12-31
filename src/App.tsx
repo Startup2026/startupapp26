@@ -4,6 +4,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+import StudentDashboard from "./pages/student/StudentDashboard";
+import JobListingsPage from "./pages/student/JobListingsPage";
+import StartupDiscoveryPage from "./pages/student/StartupDiscoveryPage";
+import StartupDashboard from "./pages/startup/StartupDashboard";
+import AdminDashboard from "./pages/admin/AdminDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -16,7 +23,31 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          
+          {/* Student routes */}
+          <Route path="/student/dashboard" element={<StudentDashboard />} />
+          <Route path="/student/jobs" element={<JobListingsPage />} />
+          <Route path="/student/startups" element={<StartupDiscoveryPage />} />
+          <Route path="/student/applications" element={<StudentDashboard />} />
+          <Route path="/student/profile" element={<StudentDashboard />} />
+          
+          {/* Startup routes */}
+          <Route path="/startup/dashboard" element={<StartupDashboard />} />
+          <Route path="/startup/jobs" element={<StartupDashboard />} />
+          <Route path="/startup/jobs/create" element={<StartupDashboard />} />
+          <Route path="/startup/applicants" element={<StartupDashboard />} />
+          <Route path="/startup/updates" element={<StartupDashboard />} />
+          <Route path="/startup/profile" element={<StartupDashboard />} />
+          
+          {/* Admin routes */}
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/admin/startups" element={<AdminDashboard />} />
+          <Route path="/admin/users" element={<AdminDashboard />} />
+          <Route path="/admin/moderation" element={<AdminDashboard />} />
+          <Route path="/admin/analytics" element={<AdminDashboard />} />
+          
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
