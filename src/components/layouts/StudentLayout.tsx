@@ -9,6 +9,7 @@ import {
   Bell,
   LogOut,
   ChevronRight,
+  Rss,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/student/dashboard" },
   { icon: Briefcase, label: "Jobs", href: "/student/jobs" },
   { icon: Building2, label: "Startups", href: "/student/startups" },
+  { icon: Rss, label: "Feed", href: "/student/feed" },
   { icon: FileText, label: "Applications", href: "/student/applications" },
   { icon: User, label: "Profile", href: "/student/profile" },
 ];
