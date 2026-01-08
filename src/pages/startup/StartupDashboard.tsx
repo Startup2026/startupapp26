@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Briefcase,
   Users,
@@ -6,6 +7,11 @@ import {
   Plus,
   MoreHorizontal,
   ArrowUpRight,
+  FileText,
+  HelpCircle,
+  Calendar,
+  ClipboardCheck,
+  Building,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { StartupLayout } from "@/components/layouts/StartupLayout";
@@ -13,6 +19,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { CreateJobModal } from "@/components/startup/CreateJobModal";
+import { CreatePostModal } from "@/components/startup/CreatePostModal";
+import { CreatePollModal } from "@/components/startup/CreatePollModal";
+import { ScheduleInterviewModal } from "@/components/startup/ScheduleInterviewModal";
+import { SelectionModal } from "@/components/startup/SelectionModal";
+import { EditStartupProfileModal } from "@/components/startup/EditStartupProfileModal";
 
 const stats = [
   { label: "Active Jobs", value: "5", icon: Briefcase, trend: "+2 this week", color: "bg-accent/10 text-accent" },
@@ -34,13 +52,34 @@ const activeJobs = [
 ];
 
 export default function StartupDashboard() {
+  const [jobModalOpen, setJobModalOpen] = useState(false);
+  const [postModalOpen, setPostModalOpen] = useState(false);
+  const [pollModalOpen, setPollModalOpen] = useState(false);
+  const [interviewModalOpen, setInterviewModalOpen] = useState(false);
+  const [selectionModalOpen, setSelectionModalOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [selectedApplicant, setSelectedApplicant] = useState({ name: "", id: "" });
+
+  const handleScheduleInterview = (applicant: { name: string; id: number }) => {
+    setSelectedApplicant({ name: applicant.name, id: `APP-${applicant.id}` });
+    setInterviewModalOpen(true);
+  };
+
+  const handleSelection = (applicant: { name: string; id: number }) => {
+    setSelectedApplicant({ name: applicant.name, id: `APP-${applicant.id}` });
+    setSelectionModalOpen(true);
+  };
+
   return (
     <StartupLayout>
       <div className="p-6 lg:p-8 space-y-8 animate-fade-in">
         {/* Welcome header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="h-16 w-16 rounded-2xl bg-accent/10 flex items-center justify-center font-bold text-accent text-2xl">
+            <div 
+              className="h-16 w-16 rounded-2xl bg-accent/10 flex items-center justify-center font-bold text-accent text-2xl cursor-pointer hover:bg-accent/20 transition-colors"
+              onClick={() => setProfileModalOpen(true)}
+            >
               TC
             </div>
             <div>
@@ -48,13 +87,60 @@ export default function StartupDashboard() {
               <p className="text-muted-foreground">Welcome back! Here's your hiring overview.</p>
             </div>
           </div>
-          <Link to="/startup/jobs/create">
-            <Button variant="hero" className="gap-2">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setProfileModalOpen(true)} className="gap-2">
+              <Building className="h-4 w-4" />
+              Edit Profile
+            </Button>
+            <Button variant="hero" className="gap-2" onClick={() => setJobModalOpen(true)}>
               <Plus className="h-4 w-4" />
               Post New Job
             </Button>
-          </Link>
+          </div>
         </div>
+
+        {/* Quick Actions */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <Button
+                variant="outline"
+                className="h-auto py-4 flex-col gap-2"
+                onClick={() => setJobModalOpen(true)}
+              >
+                <Briefcase className="h-5 w-5 text-accent" />
+                <span>Post Job</span>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-auto py-4 flex-col gap-2"
+                onClick={() => setPostModalOpen(true)}
+              >
+                <FileText className="h-5 w-5 text-accent" />
+                <span>Create Post</span>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-auto py-4 flex-col gap-2"
+                onClick={() => setPollModalOpen(true)}
+              >
+                <HelpCircle className="h-5 w-5 text-accent" />
+                <span>Create Poll</span>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-auto py-4 flex-col gap-2"
+                onClick={() => setProfileModalOpen(true)}
+              >
+                <Building className="h-5 w-5 text-accent" />
+                <span>Edit Profile</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -95,7 +181,7 @@ export default function StartupDashboard() {
                 {recentApplications.map((app) => (
                   <div
                     key={app.id}
-                    className="flex items-center gap-4 p-4 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                    className="flex items-center gap-4 p-4 rounded-lg hover:bg-muted/50 transition-colors"
                   >
                     <Avatar className="h-12 w-12">
                       <AvatarImage src="" />
@@ -121,9 +207,23 @@ export default function StartupDashboard() {
                     <span className="text-sm text-muted-foreground hidden md:block">
                       {app.time}
                     </span>
-                    <Button variant="ghost" size="icon">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleScheduleInterview(app)}>
+                          <Calendar className="h-4 w-4 mr-2" />
+                          Schedule Interview
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleSelection(app)}>
+                          <ClipboardCheck className="h-4 w-4 mr-2" />
+                          Make Selection
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 ))}
               </CardContent>
@@ -162,6 +262,24 @@ export default function StartupDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Modals */}
+      <CreateJobModal open={jobModalOpen} onOpenChange={setJobModalOpen} />
+      <CreatePostModal open={postModalOpen} onOpenChange={setPostModalOpen} />
+      <CreatePollModal open={pollModalOpen} onOpenChange={setPollModalOpen} />
+      <ScheduleInterviewModal 
+        open={interviewModalOpen} 
+        onOpenChange={setInterviewModalOpen}
+        applicantName={selectedApplicant.name}
+        applicationId={selectedApplicant.id}
+      />
+      <SelectionModal 
+        open={selectionModalOpen} 
+        onOpenChange={setSelectionModalOpen}
+        applicantName={selectedApplicant.name}
+        applicationId={selectedApplicant.id}
+      />
+      <EditStartupProfileModal open={profileModalOpen} onOpenChange={setProfileModalOpen} />
     </StartupLayout>
   );
 }
