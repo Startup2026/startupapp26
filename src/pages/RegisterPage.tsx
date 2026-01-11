@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 type UserRole = "student" | "startup";
 
@@ -25,22 +26,31 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { register } = useAuth();
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const result = await register(name, email, password, role);
 
-    toast({
-      title: "Account created!",
-      description: "Welcome to PitchIt. Let's get started.",
-    });
+    if (result.success) {
+      toast({
+        title: "Account created!",
+        description: "Welcome to PitchIt. Let's get started.",
+      });
 
-    if (role === "student") {
-      navigate("/student/dashboard");
+      if (role === "student") {
+        navigate("/student/dashboard");
+      } else {
+        navigate("/startup/dashboard");
+      }
     } else {
-      navigate("/startup/dashboard");
+      toast({
+        title: "Registration failed",
+        description: result.error || "Could not create account. Please try again.",
+        variant: "destructive",
+      });
     }
 
     setIsLoading(false);

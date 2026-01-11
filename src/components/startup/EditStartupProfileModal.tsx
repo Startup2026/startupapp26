@@ -1,4 +1,4 @@
-import { useState, ChangeEvent } from "react";
+import { useState, useEffect, ChangeEvent } from "react";
 import {
   Building,
   Globe,
@@ -7,6 +7,7 @@ import {
   Github,
   Users,
   CheckCircle,
+  Loader2,
 } from "lucide-react";
 import {
   Dialog,
@@ -27,6 +28,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
+import { startupProfileService } from "@/services/startupProfileService";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface EditStartupProfileModalProps {
   open: boolean;
@@ -43,6 +46,7 @@ type Industry = typeof industries[number];
 type Stage = typeof stages[number];
 
 interface StartupFormData {
+  _id: string;
   startupName: string;
   tagline: string;
   description: string;
@@ -60,9 +64,13 @@ interface StartupFormData {
 }
 
 export function EditStartupProfileModal({ open, onOpenChange }: EditStartupProfileModalProps) {
+  const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<StartupFormData>({
-    startupName: "TechCorp",
-    tagline: "Building the future of tech",
+    _id: "",
+    startupName: "",
+    tagline: "",
     description: "",
     industry: "FinTech",
     stage: "MVP",
@@ -72,10 +80,47 @@ export function EditStartupProfileModal({ open, onOpenChange }: EditStartupProfi
     github: "",
     foundedYear: "2023",
     teamSize: 5,
-    city: "Bangalore",
-    country: "India",
+    city: "",
+    country: "",
     hiring: true,
   });
+
+  // Fetch existing profile when modal opens
+  useEffect(() => {
+    if (open) {
+      const fetchProfile = async () => {
+        setIsLoading(true);
+        try {
+          const result = await startupProfileService.getMyProfile();
+          if (result.success && result.data) {
+            const profile = result.data;
+            setFormData({
+              _id: profile._id,
+              startupName: profile.startupName || "",
+              tagline: profile.tagline || "",
+              description: profile.description || "",
+              industry: (profile.industry as Industry) || "FinTech",
+              stage: (profile.stage as Stage) || "MVP",
+              website: profile.website || "",
+              linkedin: profile.linkedinUrl || "",
+              twitter: profile.twitterUrl || "",
+              github: "",
+              foundedYear: profile.foundedYear || "2023",
+              teamSize: parseInt(profile.teamSize || "5"),
+              city: profile.location?.split(",")[0] || "",
+              country: profile.location?.split(",")[1]?.trim() || "",
+              hiring: (profile.openPositions || 0) > 0,
+            });
+          }
+        } catch (error) {
+          console.error("Failed to fetch startup profile:", error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchProfile();
+    }
+  }, [open]);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -86,14 +131,58 @@ export function EditStartupProfileModal({ open, onOpenChange }: EditStartupProfi
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Startup Profile Updated:", formData);
-    toast({
-      title: "Profile Updated",
-      description: "Your startup profile has been saved.",
-    });
-    onOpenChange(false);
+    setIsSaving(true);
+
+    try {
+      const updateData = {
+        startupName: formData.startupName,
+        tagline: formData.tagline,
+        description: formData.description,
+        industry: formData.industry,
+        stage: formData.stage,
+        website: formData.website,
+        linkedinUrl: formData.linkedin,
+        twitterUrl: formData.twitter,
+        foundedYear: formData.foundedYear,
+        teamSize: formData.teamSize.toString(),
+        location: `${formData.city}, ${formData.country}`,
+        openPositions: formData.hiring ? 1 : 0,
+      };
+
+      let result;
+      if (formData._id) {
+        result = await startupProfileService.updateProfile(formData._id, updateData);
+      } else {
+        result = await startupProfileService.createProfile({
+          userId: user?._id || "",
+          ...updateData,
+        });
+      }
+
+      if (result.success) {
+        toast({
+          title: "Profile Updated",
+          description: "Your startup profile has been saved.",
+        });
+        onOpenChange(false);
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to update profile.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update profile. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -286,9 +375,9 @@ export function EditStartupProfileModal({ open, onOpenChange }: EditStartupProfi
             <Label htmlFor="hiring" className="cursor-pointer">Currently Hiring</Label>
           </div>
 
-          <Button type="submit" variant="hero" className="w-full gap-2">
-            <CheckCircle className="h-4 w-4" />
-            Save Profile
+          <Button type="submit" variant="hero" className="w-full gap-2" disabled={isSaving}>
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+            {isSaving ? "Saving..." : "Save Profile"}
           </Button>
         </form>
       </DialogContent>
