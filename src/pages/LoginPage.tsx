@@ -5,45 +5,48 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/Logo";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-
-type UserRole = "student" | "startup" | "admin";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<UserRole>("student");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { login } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate login
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const result = await login(email, password);
 
-    toast({
-      title: "Welcome back!",
-      description: `Logged in as ${role}`,
-    });
+    if (result.success) {
+      toast({
+        title: "Welcome back!",
+        description: "You have been logged in successfully.",
+      });
 
-    // Navigate based on role
-    if (role === "student") {
-      navigate("/student/dashboard");
-    } else if (role === "startup") {
-      navigate("/startup/dashboard");
+      // Get user from localStorage to determine role
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        if (user.role === "student") {
+          navigate("/student/dashboard");
+        } else if (user.role === "startup") {
+          navigate("/startup/dashboard");
+        } else {
+          navigate("/admin/dashboard");
+        }
+      }
     } else {
-      navigate("/admin/dashboard");
+      toast({
+        title: "Login failed",
+        description: result.error || "Invalid credentials. Please try again.",
+        variant: "destructive",
+      });
     }
 
     setIsLoading(false);
@@ -103,20 +106,6 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleLogin} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="role">I am a</Label>
-              <Select value={role} onValueChange={(value: UserRole) => setRole(value)}>
-                <SelectTrigger className="h-12">
-                  <SelectValue placeholder="Select your role" />
-                </SelectTrigger>
-                <SelectContent className="bg-card border-border">
-                  <SelectItem value="student">Student</SelectItem>
-                  <SelectItem value="startup">Startup</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <div className="relative">

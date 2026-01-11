@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   User,
   Mail,
@@ -15,6 +15,7 @@ import {
   Github,
   Linkedin,
   Globe,
+  Loader2,
 } from "lucide-react";
 import { StudentLayout } from "@/components/layouts/StudentLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,41 +27,87 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
+import { studentProfileService, StudentProfile } from "@/services/studentProfileService";
+import { useAuth } from "@/contexts/AuthContext";
 
 const initialProfile = {
-  firstName: "Alex",
-  lastName: "Johnson",
-  email: "alex.johnson@student.edu",
-  phone: "+91 9876543210",
-  location: "Mumbai, India",
-  bio: "Final year Computer Science student passionate about building user-centric products. Looking for opportunities in product management and frontend development.",
-  college: "IIT Mumbai",
-  degree: "B.Tech Computer Science",
-  graduationYear: "2026",
-  skills: ["React", "TypeScript", "UI/UX Design", "Python", "Data Analysis", "Product Management"],
-  interests: ["AI/ML", "FinTech", "SaaS", "EdTech"],
-  experience: [
-    {
-      id: 1,
-      title: "Frontend Intern",
-      company: "TechCorp",
-      duration: "Jun 2025 - Aug 2025",
-    },
-  ],
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+  location: "",
+  bio: "",
+  college: "",
+  degree: "",
+  graduationYear: "",
+  skills: [] as string[],
+  interests: [] as string[],
+  experience: [] as { id: number; title: string; company: string; duration: string }[],
   links: {
-    github: "github.com/alexjohnson",
-    linkedin: "linkedin.com/in/alexjohnson",
-    portfolio: "alexjohnson.dev",
+    github: "",
+    linkedin: "",
+    portfolio: "",
   },
-  resume: "Alex_Johnson_Resume.pdf",
+  resume: "",
+  _id: "",
 };
 
 export default function StudentProfilePage() {
+  const { user } = useAuth();
   const [profile, setProfile] = useState(initialProfile);
   const [isEditing, setIsEditing] = useState(false);
   const [editedProfile, setEditedProfile] = useState(initialProfile);
   const [newSkill, setNewSkill] = useState("");
   const [newInterest, setNewInterest] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Fetch profile on mount
+  useEffect(() => {
+    const fetchProfile = async () => {
+      setIsLoading(true);
+      try {
+        const result = await studentProfileService.getMyProfile();
+        if (result.success && result.data) {
+          const apiProfile = result.data;
+          const mappedProfile = {
+            firstName: apiProfile.firstName || "",
+            lastName: apiProfile.lastName || "",
+            email: apiProfile.email || "",
+            phone: apiProfile.phone || "",
+            location: apiProfile.location || "",
+            bio: apiProfile.bio || "",
+            college: apiProfile.education?.[0]?.institution || "",
+            degree: `${apiProfile.education?.[0]?.degree || ""} ${apiProfile.education?.[0]?.field || ""}`.trim(),
+            graduationYear: apiProfile.education?.[0]?.endYear || "",
+            skills: apiProfile.skills || [],
+            interests: apiProfile.interests || [],
+            experience: (apiProfile.experience || []).map((exp: any, idx: number) => ({
+              id: idx,
+              title: exp.title || "",
+              company: exp.company || "",
+              duration: exp.duration || "",
+            })),
+            links: {
+              github: apiProfile.githubUrl || "",
+              linkedin: apiProfile.linkedinUrl || "",
+              portfolio: apiProfile.portfolioUrl || "",
+            },
+            resume: apiProfile.resumeUrl || "",
+            _id: apiProfile._id,
+          };
+          setProfile(mappedProfile);
+          setEditedProfile(mappedProfile);
+        }
+      } catch (error) {
+        console.error("Failed to fetch profile:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, []);
 
   // Calculate profile completion
   const calculateCompletion = () => {
@@ -83,13 +130,55 @@ export default function StudentProfilePage() {
 
   const completionPercentage = calculateCompletion();
 
-  const handleSave = () => {
-    setProfile(editedProfile);
-    setIsEditing(false);
-    toast({
-      title: "Profile Updated",
-      description: "Your profile has been saved successfully.",
-    });
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const updateData = {
+        firstName: editedProfile.firstName,
+        lastName: editedProfile.lastName,
+        email: editedProfile.email,
+        phone: editedProfile.phone,
+        location: editedProfile.location,
+        bio: editedProfile.bio,
+        skills: editedProfile.skills,
+        interests: editedProfile.interests,
+        githubUrl: editedProfile.links.github,
+        linkedinUrl: editedProfile.links.linkedin,
+        portfolioUrl: editedProfile.links.portfolio,
+        education: [{
+          institution: editedProfile.college,
+          degree: editedProfile.degree.split(" ")[0] || "",
+          field: editedProfile.degree.split(" ").slice(1).join(" ") || "",
+          startYear: "",
+          endYear: editedProfile.graduationYear,
+        }],
+      };
+
+      const result = await studentProfileService.updateProfile(profile._id, updateData);
+      
+      if (result.success) {
+        setProfile(editedProfile);
+        setIsEditing(false);
+        toast({
+          title: "Profile Updated",
+          description: "Your profile has been saved successfully.",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to update profile.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update profile. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const addSkill = () => {
@@ -128,6 +217,16 @@ export default function StudentProfilePage() {
 
   const currentProfile = isEditing ? editedProfile : profile;
 
+  if (isLoading) {
+    return (
+      <StudentLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-accent" />
+        </div>
+      </StudentLayout>
+    );
+  }
+
   return (
     <StudentLayout>
       <div className="p-6 lg:p-8 animate-fade-in">
@@ -152,12 +251,12 @@ export default function StudentProfilePage() {
             </Button>
           ) : (
             <div className="flex gap-2 mt-4 md:mt-0">
-              <Button variant="ghost" onClick={() => setIsEditing(false)}>
+              <Button variant="ghost" onClick={() => setIsEditing(false)} disabled={isSaving}>
                 Cancel
               </Button>
-              <Button variant="hero" onClick={handleSave}>
-                <Save className="h-4 w-4 mr-2" />
-                Save Changes
+              <Button variant="hero" onClick={handleSave} disabled={isSaving}>
+                {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                {isSaving ? "Saving..." : "Save Changes"}
               </Button>
             </div>
           )}
