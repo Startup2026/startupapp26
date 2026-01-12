@@ -37,13 +37,14 @@ export default function RegisterPage() {
     if (result.success) {
       toast({
         title: "Account created!",
-        description: "Welcome to PitchIt. Let's get started.",
+        description: "Let's set up your profile.",
       });
 
+      // Redirect to profile creation page
       if (role === "student") {
-        navigate("/student/dashboard");
+        navigate("/student/create-profile");
       } else {
-        navigate("/startup/dashboard");
+        navigate("/startup/create-profile");
       }
     } else {
       toast({

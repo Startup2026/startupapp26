@@ -13,9 +13,11 @@ import JobDetailsPage from "./pages/student/JobDetailsPage";
 import ApplicationsPage from "./pages/student/ApplicationsPage";
 import StartupDiscoveryPage from "./pages/student/StartupDiscoveryPage";
 import StudentProfilePage from "./pages/student/StudentProfilePage";
+import CreateStudentProfilePage from "./pages/student/CreateStudentProfilePage";
 import StartupFeedPage from "./pages/student/StartupFeedPage";
 import StartupProfilePage from "./pages/student/StartupProfilePage";
 import StartupDashboard from "./pages/startup/StartupDashboard";
+import CreateStartupProfilePage from "./pages/startup/CreateStartupProfilePage";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import NotFound from "./pages/NotFound";
 
@@ -34,6 +36,7 @@ const App = () => (
             <Route path="/register" element={<RegisterPage />} />
             
             {/* Student routes */}
+            <Route path="/student/create-profile" element={<CreateStudentProfilePage />} />
             <Route path="/student/dashboard" element={<StudentDashboard />} />
             <Route path="/student/jobs" element={<JobListingsPage />} />
             <Route path="/student/jobs/:id" element={<JobDetailsPage />} />
@@ -44,6 +47,7 @@ const App = () => (
             <Route path="/student/feed" element={<StartupFeedPage />} />
             
             {/* Startup routes */}
+            <Route path="/startup/create-profile" element={<CreateStartupProfilePage />} />
             <Route path="/startup/dashboard" element={<StartupDashboard />} />
             <Route path="/startup/jobs" element={<StartupDashboard />} />
             <Route path="/startup/jobs/create" element={<StartupDashboard />} />
