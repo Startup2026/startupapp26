@@ -18,8 +18,6 @@ import StartupFeedPage from "./pages/student/StartupFeedPage";
 import StartupProfilePage from "./pages/student/StartupProfilePage";
 import StartupDashboard from "./pages/startup/StartupDashboard";
 import CreateStartupProfilePage from "./pages/startup/CreateStartupProfilePage";
-import StartupJobsPage from "./pages/startup/StartupJobsPage";
-import StartupJobDetailPage from "./pages/startup/StartupJobDetailPage";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import NotFound from "./pages/NotFound";
 
@@ -51,9 +49,8 @@ const App = () => (
             {/* Startup routes */}
             <Route path="/startup/create-profile" element={<CreateStartupProfilePage />} />
             <Route path="/startup/dashboard" element={<StartupDashboard />} />
-            <Route path="/startup/jobs" element={<StartupJobsPage />} />
+            <Route path="/startup/jobs" element={<StartupDashboard />} />
             <Route path="/startup/jobs/create" element={<StartupDashboard />} />
-            <Route path="/startup/jobs/:id" element={<StartupJobDetailPage />} />
             <Route path="/startup/applicants" element={<StartupDashboard />} />
             <Route path="/startup/updates" element={<StartupDashboard />} />
             <Route path="/startup/profile" element={<StartupDashboard />} />
