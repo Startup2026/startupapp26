@@ -20,12 +20,8 @@ import StartupDashboard from "./pages/startup/StartupDashboard";
 import CreateStartupProfilePage from "./pages/startup/CreateStartupProfilePage";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import NotFound from "./pages/NotFound";
-import JobDetailPage from "./pages/startup/StartupJobDetail";
-import StartupJobDetail from "./pages/startup/StartupJobDetail";
-import StartupApplicants from "./pages/startup/StartupApplicants";
-import StartupUpdates from "./pages/startup/StartupUpdates";
-import StartupJobAnalysis from "./components/startup/StartupJobAnalysis";
-import ProfilePage from "./pages/startup/StartupProfile";
+import StartupJobsPage from "./pages/startup/StartupJobsPage";
+import JobApplicationsPage from "./pages/startup/JobApplicationsPage";
 import StartupProfile from "./pages/startup/StartupProfile";
 import Shortlisted from "./pages/startup/Shortlisted";
 import Selected from "./pages/startup/Selected";
@@ -58,12 +54,8 @@ const App = () => (
             {/* Startup routes */}
             <Route path="/startup/create-profile" element={<CreateStartupProfilePage />} />
             <Route path="/startup/dashboard" element={<StartupDashboard />} />
-
-            <Route path="/startup/jobs" element={<StartupJobDetail />} />
-
-            <Route path="/startup/jobs/create" element={<StartupDashboard />} />
-            {/* <Route path="/startup/applicants" element={<StartupApplicants />} /> */}
-            {/* <Route path="/startup/updates" element={<StartupUpdates />} /> */}
+            <Route path="/startup/jobs" element={<StartupJobsPage />} />
+            <Route path="/startup/jobs/:jobId/applications" element={<JobApplicationsPage />} />
             <Route path="/startup/profile" element={<StartupProfile />} />
             <Route path="/startup/shortlisted" element={<Shortlisted />} />
             <Route path="/startup/selected" element={<Selected />} />
