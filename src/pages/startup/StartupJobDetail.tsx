@@ -1,16 +1,5 @@
 import { useState, useEffect } from "react";
-import {
-  Briefcase,
-  Users,
-  Calendar,
-  Layers,
-  GraduationCap,
-  Mail,
-  CheckCircle,
-  MoreVertical,
-  Plus,
-  Search,
-} from "lucide-react";
+import { Briefcase, Users, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,14 +19,29 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-import { StartupLayout } from "@/components/layouts/StartupLayout"; // Integrated Sidebar/Navbar Layout
+import { StartupLayout } from "@/components/layouts/StartupLayout";
+
+/* ---------------- TYPES ---------------- */
+
+type ApplicantStatus =
+  | "Applied"
+  | "Shortlisted"
+  | "Interview Scheduled"
+  | "Selected"
+  | "Rejected";
 
 interface Applicant {
-  id: number;
+  id: string;
+  jobId: number; // ✅ ADD THIS
   name: string;
   email: string;
+  role: string;
   appliedOn: string;
-  status: "Pending" | "Shortlisted" | "Rejected";
+  skills: string[];
+  resumeUrl: string;
+  experience: number;
+  education: string;
+  status: ApplicantStatus;
 }
 
 interface Job {
@@ -52,6 +56,8 @@ interface Job {
   status: "Open" | "Closed";
 }
 
+/* ---------------- DATA ---------------- */
+
 const skillsList = [
   "React",
   "Node.js",
@@ -63,212 +69,181 @@ const skillsList = [
   "Docker",
 ];
 
+const hardcodedJobs: Job[] = [
+  {
+    id: 101,
+    title: "Frontend Developer",
+    description: "Looking for a React developer with strong UI skills.",
+    experienceRequired: "1-3 years",
+    educationRequired: "B.E / B.Tech",
+    skillsRequired: ["React", "JavaScript", "CSS"],
+    postedOn: "2025-01-10",
+    status: "Open",
+    applicants: [
+      {
+        id: "1",
+        jobId: 101,
+        name: "Amit Sharma",
+        email: "amit@gmail.com",
+        role: "Frontend Developer",
+        appliedOn: "2025-01-12",
+        skills: ["React", "JavaScript", "CSS"],
+        resumeUrl: "/resumes/amit-sharma.pdf",
+        experience: 2,
+        education: "B.E Computer Engineering",
+        status: "Applied",
+      },
+    ],
+  },
+];
+
+/* ---------------- COMPONENT ---------------- */
+
 export default function StartupJobDetail() {
-  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-  const [viewApplicants, setViewApplicants] = useState(false);
-  const [editJob, setEditJob] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  // const [jobs, setJobs] = useState<Job[]>([]);
 
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const [jobs, setJobs] = useState<Job[]>(() => {
+    if (typeof window === "undefined") return [];
 
-  const hardcodedJobs: Job[] = [
-    {
-      id: 101,
-      title: "Frontend Developer",
-      description: "Looking for a React developer with strong UI skills.",
-      experienceRequired: "1-3 years",
-      educationRequired: "B.E / B.Tech",
-      skillsRequired: ["React", "JavaScript", "CSS"],
-      postedOn: "2025-01-10",
-      status: "Open",
-      applicants: [
-        {
-          id: 1,
-          name: "Amit Sharma",
-          email: "amit@gmail.com",
-          appliedOn: "2025-01-12",
-          status: "Pending",
-        },
-      ],
-    },
-    {
-      id: 102,
-      title: "Backend Developer",
-      description: "Node.js developer required for scalable APIs.",
-      experienceRequired: "2+ years",
-      educationRequired: "B.E / MCA",
-      skillsRequired: ["Node.js", "MongoDB", "Express"],
-      postedOn: "2025-01-08",
-      status: "Open",
-      applicants: [],
-    },
-  ];
+    const stored = localStorage.getItem("startup_jobs");
+    if (stored) return JSON.parse(stored);
 
-  useEffect(() => {
-    const storedJobs: Job[] = JSON.parse(
-      localStorage.getItem("startup_jobs") || "[]"
-    );
-
-    const mergedJobs = [
-      ...hardcodedJobs,
-      ...storedJobs.filter(
-        (stored) => !hardcodedJobs.some((hard) => hard.id === stored.id)
-      ),
-    ];
-
-    setJobs(mergedJobs);
-  }, []);
-
-  const filteredJobs = jobs.filter((job) => {
-    const query = searchQuery.toLowerCase();
-    return (
-      job.title.toLowerCase().includes(query) ||
-      job.skillsRequired.some((skill) => skill.toLowerCase().includes(query))
-    );
+    localStorage.setItem("startup_jobs", JSON.stringify(hardcodedJobs));
+    return hardcodedJobs;
   });
+
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [selectedApplicant, setSelectedApplicant] = useState<Applicant | null>(
+    null,
+  );
+  const [searchQuery, setSearchQuery] = useState("");
+  const [editJob, setEditJob] = useState(false);
+
+  const toggleJobStatus = (jobId: number) => {
+    setJobs((prevJobs): Job[] => {
+      const updatedJobs: Job[] = prevJobs.map((job) =>
+        job.id === jobId
+          ? {
+              ...job,
+              status: job.status === "Open" ? "Closed" : "Open",
+            }
+          : job,
+      );
+
+      localStorage.setItem("startup_jobs", JSON.stringify(updatedJobs));
+      return updatedJobs;
+    });
+
+    toast({
+      title: "Job Status Updated",
+      description: "Job position status changed",
+    });
+  };
 
   const handleStatusUpdate = (
     jobId: number,
-    applicantId: number,
-    newStatus: Applicant["status"]
+    applicantId: string,
+    status: ApplicantStatus,
   ) => {
-    const updatedJobs = jobs.map((j) => {
-      if (j.id !== jobId) return j;
-
-      const updatedApplicants = j.applicants.map((a) =>
-        a.id === applicantId ? { ...a, status: newStatus } : a
-      );
-
-      return { ...j, applicants: updatedApplicants };
-    });
-
-    // Update state
-    setJobs(updatedJobs);
-
-    // Update selected job (dialog)
-    if (selectedJob && selectedJob.id === jobId) {
-      const updatedApplicants = selectedJob.applicants.map((a) =>
-        a.id === applicantId ? { ...a, status: newStatus } : a
-      );
-      setSelectedJob({ ...selectedJob, applicants: updatedApplicants });
-    }
-
-    // Persist to localStorage
-    localStorage.setItem("startup_jobs", JSON.stringify(updatedJobs));
-
-    toast({
-      title: "Status Updated",
-      description: `Applicant is now ${newStatus}.`,
-    });
-  };
-
-  const handleEditSave = () => {
-    const updatedJobs = jobs.map((j) =>
-      j.id === selectedJob.id ? selectedJob : j
+    const updatedJobs = jobs.map((job) =>
+      job.id !== jobId
+        ? job
+        : {
+            ...job,
+            applicants: job.applicants.map((a) =>
+              a.id === applicantId ? { ...a, status } : a,
+            ),
+          },
     );
 
     setJobs(updatedJobs);
     localStorage.setItem("startup_jobs", JSON.stringify(updatedJobs));
 
-    setEditJob(false);
-    toast({ title: "Updated", description: "Job card updated." });
+    if (selectedApplicant) {
+      setSelectedApplicant({ ...selectedApplicant, status });
+    }
+
+    toast({
+      title: "Status Updated",
+      description: `Applicant marked as ${status}`,
+    });
   };
 
-  const toggleSkill = (skill) => {
-    const isSelected = selectedJob.skillsRequired.includes(skill);
-    const updatedSkills = isSelected
-      ? selectedJob.skillsRequired.filter((s) => s !== skill) // Remove
-      : [...selectedJob.skillsRequired, skill]; // Add
+  /* -------- FILTER -------- */
 
-    setSelectedJob({ ...selectedJob, skillsRequired: updatedSkills });
-  };
+  const filteredJobs = jobs.filter((job) =>
+    job.title.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
 
   return (
     <StartupLayout>
-      <div className="p-6 lg:p-8 space-y-6 animate-fade-in">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <h1 className="text-3xl font-bold flex items-center gap-3">
-            <Briefcase className="h-8 w-8 text-accent" /> Posted Jobs
+      <div className="p-6 space-y-6">
+        {/* HEADER */}
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Briefcase className="h-7 w-7 text-accent" />
+            Posted Jobs
           </h1>
 
-          <div className="relative w-full md:w-80">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <div className="relative w-80">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by title or skills..."
               className="pl-10"
+              placeholder="Search jobs..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
         </div>
 
-        {/* One container for ALL cards */}
+        {/* JOB CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredJobs.map((job) => (
-            <Card key={job.id} className="flex flex-col border-border">
+            <Card key={job.id}>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-bold">
-                    {job.title}
-                  </CardTitle>
-                  {/* Status Badge */}
+                <div className="flex justify-between">
+                  <CardTitle>{job.title}</CardTitle>
+
                   <Badge
-                    variant="outline"
-                    className={
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleJobStatus(job.id);
+                    }}
+                    className={`cursor-pointer ${
                       job.status === "Open"
-                        ? "bg-teal-500 text-white border-teal-200"
-                        : ""
-                    }
+                        ? "bg-teal-500 text-white hover:bg-teal-600"
+                        : "bg-gray-400 text-white hover:bg-gray-500"
+                    }`}
                   >
                     {job.status}
                   </Badge>
                 </div>
               </CardHeader>
-
-              <CardContent className="space-y-4 flex-1">
-                <p className="text-sm text-muted-foreground line-clamp-2">
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
                   {job.description}
                 </p>
-
-                {/* Skills - These will update live when you toggle them in Edit Job */}
-                <div className="flex flex-wrap gap-1.5">
-                  {job.skillsRequired.map((skill) => (
-                    <Badge
-                      key={skill}
-                      variant="outline"
-                      className="text-[10px] uppercase"
-                    >
-                      {skill}
+                <div className="flex flex-wrap gap-1">
+                  {job.skillsRequired.map((s) => (
+                    <Badge key={s} variant="outline">
+                      {s}
                     </Badge>
                   ))}
                 </div>
-
                 <div className="flex items-center gap-2 text-sm">
-                  <Users className="h-4 w-4 text-accent" />
-                  <span
-                    className={
-                      job.applicants.length > 0
-                        ? "font-medium"
-                        : "text-muted-foreground"
-                    }
-                  >
-                    {job.applicants.length}{" "}
-                    {job.applicants.length === 1 ? "Applicant" : "Applicants"}
-                  </span>
+                  <Users className="h-4 w-4" />
+                  {job.applicants.length} Applicants
                 </div>
-
-                {/* Action Buttons - No <hr /> lines here */}
-                <div className="grid grid-cols-2 gap-2 pt-4">
+                <div className="grid grid-cols-2 gap-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      setSelectedJob(job);
-                      setViewApplicants(true);
-                    }}
+                    disabled={job.status === "Closed"}
+                    onClick={() => setSelectedJob(job)}
                   >
-                    Applicants
+                    View Applicants
                   </Button>
+
                   <Button
                     variant="ghost"
                     size="sm"
@@ -277,105 +252,47 @@ export default function StartupJobDetail() {
                       setEditJob(true);
                     }}
                   >
-                    Edit Job
+                    Edit Post
                   </Button>
-                </div>
-              </CardContent>
+                </div>{" "}
+              </CardContent>{" "}
             </Card>
-          ))}
+          ))}{" "}
         </div>
 
-        {/* View Applicants Dialog */}
-        <Dialog open={viewApplicants} onOpenChange={setViewApplicants}>
-          <DialogContent className="max-w-xl">
+        {/* APPLICANTS LIST */}
+        <Dialog open={!!selectedJob} onOpenChange={() => setSelectedJob(null)}>
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Applicants for {selectedJob?.title}</DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 mt-4">
-              {selectedJob?.applicants.length === 0 && (
-                <p className="text-center text-muted-foreground py-10">
-                  No applicants yet.
-                </p>
-              )}
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto">
               {selectedJob?.applicants.map((a) => (
                 <Card
                   key={a.id}
-                  className="bg-muted/30 border-none shadow-none"
+                  onClick={() => {
+                    setSelectedApplicant({ ...a, jobId: selectedJob!.id });
+                    setSelectedJob(null);
+                  }}
+                  className="cursor-pointer hover:bg-muted/40"
                 >
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold text-foreground">
-                          {a.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {a.email}
-                        </p>
-                        <p className="text-[10px] mt-1 italic">
-                          Applied on {a.appliedOn}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant={
-                            a.status === "Rejected"
-                              ? "destructive"
-                              : "secondary"
-                          }
-                        >
-                          {a.status}
-                        </Badge>
-
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                            >
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() =>
-                                handleStatusUpdate(
-                                  selectedJob.id,
-                                  a.id,
-                                  "Pending"
-                                )
-                              }
-                            >
-                              Pending
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                handleStatusUpdate(
-                                  selectedJob.id,
-                                  a.id,
-                                  "Shortlisted"
-                                )
-                              }
-                            >
-                              Shortlisted
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                handleStatusUpdate(
-                                  selectedJob.id,
-                                  a.id,
-                                  "Rejected"
-                                )
-                              }
-                            >
-                              Rejected
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
+                  <CardContent className="p-4 flex justify-between">
+                    <div>
+                      <p className="font-medium">{a.name}</p>
+                      <p className="text-xs text-muted-foreground">{a.email}</p>
                     </div>
+                    {/* <Badge>{a.status}</Badge> */}
+
+                    <Badge
+                      className={
+                        a.status === "Rejected"
+                          ? "bg-red-500 text-white"
+                          : "bg-teal-500 text-white"
+                      }
+                    >
+                      {a.status}
+                    </Badge>
                   </CardContent>
                 </Card>
               ))}
@@ -383,85 +300,103 @@ export default function StartupJobDetail() {
           </DialogContent>
         </Dialog>
 
-        {/* Edit Job Dialog */}
-        <Dialog open={editJob} onOpenChange={setEditJob}>
-          <DialogContent className="max-w-xl">
+        {/* APPLICANT DETAIL MODAL */}
+        <Dialog
+          open={!!selectedApplicant}
+          onOpenChange={() => setSelectedApplicant(null)}
+        >
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Edit Job Details</DialogTitle>
+              <DialogTitle>Applicant Details</DialogTitle>
             </DialogHeader>
 
-            {selectedJob && (
-              <form
-                className="space-y-4 pt-4"
-                onSubmit={(e) => e.preventDefault()}
-              >
-                <div className="space-y-2">
-                  <Label>Job Title</Label>
-                  {/* <Input defaultValue={selectedJob.title} /> */}
-                  <Input
-                    value={selectedJob.title}
-                    onChange={(e) =>
-                      setSelectedJob({ ...selectedJob, title: e.target.value })
-                    }
-                  />
+            {selectedApplicant && (
+              <div className="space-y-4">
+                <div>
+                  <p className="text-lg font-semibold">
+                    {selectedApplicant.name}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedApplicant.email}
+                  </p>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  {/* <Textarea defaultValue={selectedJob.description} className="min-h-[100px]" /> */}
+                <div className="flex justify-between text-sm">
+                  <span>Role: {selectedApplicant.role}</span>
+                  <span>Applied on: {selectedApplicant.appliedOn}</span>
+                </div>
 
-                  <Textarea
-                    value={selectedJob.description}
-                    onChange={(e) =>
-                      setSelectedJob({
-                        ...selectedJob,
-                        description: e.target.value,
-                      })
+                <div className="flex items-center gap-3">
+                  {/* <Badge>{selectedApplicant.status}</Badge> */}
+
+                  <Badge
+                    className={
+                      selectedApplicant.status === "Rejected"
+                        ? "bg-red-500 text-white hover:bg-red-600"
+                        : "bg-teal-500 text-white hover:bg-teal-600"
                     }
-                    className="min-h-[100px]"
-                  />
+                  >
+                    {selectedApplicant.status}
+                  </Badge>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        Change Status
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      {[
+                        "Applied",
+                        "Shortlisted",
+                        "Interview Scheduled",
+                        "Selected",
+                        "Rejected",
+                      ].map((s) => (
+                        <DropdownMenuItem
+                          key={s}
+                          onClick={() =>
+                            handleStatusUpdate(
+                              selectedApplicant.jobId,
+                              selectedApplicant.id,
+                              s as ApplicantStatus,
+                            )
+                          }
+                        >
+                          {s}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
 
                 <div>
-                  <Label className="text-sm font-medium">
-                    Skills Required (Click to add/remove)
-                  </Label>
-                  <div className="flex flex-wrap gap-2 mt-3 p-3 border rounded-lg bg-muted/20">
-                    {skillsList.map((skill) => {
-                      const isSelected =
-                        selectedJob.skillsRequired.includes(skill);
-                      return (
-                        <Badge
-                          key={skill}
-                          variant={isSelected ? "accent" : "outline"}
-                          className="cursor-pointer select-none"
-                          onClick={() => {
-                            const updated = isSelected
-                              ? selectedJob.skillsRequired.filter(
-                                  (s) => s !== skill
-                                )
-                              : [...selectedJob.skillsRequired, skill];
-                            setSelectedJob({
-                              ...selectedJob,
-                              skillsRequired: updated,
-                            });
-                          }}
-                        >
-                          {skill} {isSelected ? "×" : "+"}
-                        </Badge>
-                      );
-                    })}
+                  <p className="text-sm font-medium">Skills</p>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {selectedApplicant.skills.map((skill) => (
+                      <Badge key={skill} variant="outline">
+                        {skill}
+                      </Badge>
+                    ))}
                   </div>
                 </div>
 
+                <p>Experience: {selectedApplicant.experience} years</p>
+                <p>Education: {selectedApplicant.education}</p>
+
                 <Button
-                  className="w-full gap-2 mt-4"
-                  variant="hero"
-                  onClick={handleEditSave}
+                  asChild
+                  className="outline bg-teal-500 text-white hover:bg-teal-600"
                 >
-                  <CheckCircle className="h-4 w-4" /> Save Changes
+                  <a
+                    href={selectedApplicant.resumeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    View Resume
+                  </a>
                 </Button>
-              </form>
+              </div>
             )}
           </DialogContent>
         </Dialog>

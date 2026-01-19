@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -23,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { CreateJobModal } from "../startup/CreateJobModal";
 
 interface StartupLayoutProps {
   children: ReactNode;
@@ -33,12 +34,14 @@ const navItems = [
   { icon: Briefcase, label: "Job Posts", href: "/startup/jobs" },
   { icon: Users, label: "Applicants", href: "/startup/applicants" },
   { icon: FileEdit, label: "Updates", href: "/startup/updates" },
-  // { icon: BarChart3, label: "Job Analysis", href: "/startup/jobanalysis" },
+  { icon: Users, label: "Shortlisted", href: "/startup/shortlisted" },
+  { icon: Users, label: "Selected", href: "/startup/selected" },
   { icon: Building2, label: "Company Profile", href: "/startup/profile" },
 ];
 
 export function StartupLayout({ children }: StartupLayoutProps) {
   const location = useLocation();
+  const [jobModalOpen, setJobModalOpen] = useState(false);
 
   return (
     <div className="min-h-screen flex w-full bg-background">
@@ -49,12 +52,12 @@ export function StartupLayout({ children }: StartupLayoutProps) {
         </div>
 
         <div className="px-4 mb-4">
-          <Link to="/startup/jobs/create">
-            <Button variant="hero" className="w-full gap-2">
+          {/* <Link to="/startup/jobs/create"> */}
+            <Button variant="hero" className="w-full gap-2" onClick={() => setJobModalOpen(true)}>
               <Plus className="h-4 w-4" />
               Post a Job
             </Button>
-          </Link>
+          {/* </Link> */}
         </div>
 
         <nav className="flex-1 px-4 space-y-1">
@@ -136,6 +139,15 @@ export function StartupLayout({ children }: StartupLayoutProps) {
           {children}
         </main>
       </div>
+
+
+      <CreateJobModal
+      open={jobModalOpen}
+      onOpenChange={setJobModalOpen}
+    />
+
+
     </div>
+
   );
 }

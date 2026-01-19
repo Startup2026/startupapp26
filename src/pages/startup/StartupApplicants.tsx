@@ -38,63 +38,64 @@ import { toast } from "@/hooks/use-toast";
 
 /* ---------------- Types ---------------- */
 
-type ApplicationStatus = "PENDING" | "SHORTLISTED" | "REJECTED";
+type ApplicationStatus =
+  | "APPLIED"
+  | "SHORTLISTED"
+  | "REJECTED"
+  | "INTERVIEW_SCHEDULED"
+  | "SELECTED";
 
 interface Application {
-  id: number;
+  _id: string;
+  jobId: string;
+  studentId: string;
+
   candidateName: string;
   candidateEmail: string;
+
   jobTitle: string;
-  role: string;
   skills: string[];
-  appliedAt: string;
+
+  appliedAt: string; // createdAt
   status: ApplicationStatus;
+
+  atsScore: number;
   experience: number;
   education: string;
-  resumeUrl: string;
-}
 
-/* ---------------- Dummy Data ---------------- */
+  resumeUrl: string | null;
+}
 
 const initialApplications: Application[] = [
   {
-    id: 1,
+    _id: "1",
+    jobId: "job123",
+    studentId: "stu123",
     candidateName: "Amit Sharma",
     candidateEmail: "amit@gmail.com",
     jobTitle: "Frontend Developer",
-    role: "Frontend Developer",
     skills: ["React", "TypeScript", "Tailwind"],
     appliedAt: "12 Jan 2026",
-    status: "PENDING",
+    status: "APPLIED",
+    atsScore: 78,
     experience: 2,
     education: "B.E. Computer Engineering",
     resumeUrl: "/resume/amit.pdf",
   },
   {
-    id: 2,
+    _id: "2",
+    jobId: "job124",
+    studentId: "stu124",
     candidateName: "Neha Patil",
     candidateEmail: "neha@gmail.com",
     jobTitle: "Backend Engineer",
-    role: "Backend Engineer",
     skills: ["Node.js", "MongoDB", "Express"],
     appliedAt: "13 Jan 2026",
     status: "SHORTLISTED",
+    atsScore: 85,
     experience: 3,
-    education: "B.Tech Information Technology",
+    education: "B.Tech IT",
     resumeUrl: "/resume/neha.pdf",
-  },
-  {
-    id: 3,
-    candidateName: "Rahul Verma",
-    candidateEmail: "rahul@gmail.com",
-    jobTitle: "UI/UX Designer",
-    role: "UI/UX Designer",
-    skills: ["Figma", "UX", "Prototyping"],
-    appliedAt: "14 Jan 2026",
-    status: "REJECTED",
-    experience: 1,
-    education: "B.Des Interaction Design",
-    resumeUrl: "/resume/rahul.pdf",
   },
 ];
 
@@ -109,14 +110,14 @@ export default function StartupApplicants() {
   const [selectedApplicant, setSelectedApplicant] =
     useState<Application | null>(null);
 
-  const updateStatus = (id: number, status: ApplicationStatus) => {
+  const updateStatus = (_id: string, status: ApplicationStatus) => {
     setApplications((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status } : a))
+      prev.map((a) => (a._id === _id ? { ...a, status } : a)),
     );
 
     toast({
       title: "Status Updated",
-      description: `Applicant marked as ${status}`,
+      description: `Applicant marked as ${status.replace("_", " ")}`,
     });
   };
 
@@ -155,10 +156,15 @@ export default function StartupApplicants() {
               <SelectTrigger className="w-44">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
+
               <SelectContent>
                 <SelectItem value="ALL">All</SelectItem>
-                <SelectItem value="PENDING">Pending</SelectItem>
+                <SelectItem value="APPLIED">Applied</SelectItem>
                 <SelectItem value="SHORTLISTED">Shortlisted</SelectItem>
+                <SelectItem value="INTERVIEW_SCHEDULED">
+                  Interview Scheduled
+                </SelectItem>
+                <SelectItem value="SELECTED">Selected</SelectItem>
                 <SelectItem value="REJECTED">Rejected</SelectItem>
               </SelectContent>
             </Select>
@@ -169,7 +175,7 @@ export default function StartupApplicants() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredApplications.map((app) => (
             <Card
-              key={app.id}
+              key={app._id}
               onClick={() => setSelectedApplicant(app)}
               className="cursor-pointer hover:border-teal-500 transition"
             >
@@ -188,17 +194,33 @@ export default function StartupApplicants() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
-                        onClick={() => updateStatus(app.id, "PENDING")}
+                        onClick={() => updateStatus(app._id, "APPLIED")}
                       >
-                        Mark Pending
+                        Mark Applied
                       </DropdownMenuItem>
+
                       <DropdownMenuItem
-                        onClick={() => updateStatus(app.id, "SHORTLISTED")}
+                        onClick={() => updateStatus(app._id, "SHORTLISTED")}
                       >
                         Shortlist
                       </DropdownMenuItem>
+
                       <DropdownMenuItem
-                        onClick={() => updateStatus(app.id, "REJECTED")}
+                        onClick={() =>
+                          updateStatus(app._id, "INTERVIEW_SCHEDULED")
+                        }
+                      >
+                        Schedule Interview
+                      </DropdownMenuItem>
+
+                      <DropdownMenuItem
+                        onClick={() => updateStatus(app._id, "SELECTED")}
+                      >
+                        Select Candidate
+                      </DropdownMenuItem>
+
+                      <DropdownMenuItem
+                        onClick={() => updateStatus(app._id, "REJECTED")}
                       >
                         Reject
                       </DropdownMenuItem>
@@ -230,28 +252,20 @@ export default function StartupApplicants() {
                   ))}
                 </div>
 
-                {/* <Badge
-                  variant={
-                    app.status === "REJECTED"
-                      ? "destructive"
-                      : app.status === "SHORTLISTED"
-                      ? "default"
-                      : "secondary"
-                  }
-                >
-                  {app.status}
-                </Badge> */}
-
                 <Badge
                   className={
                     app.status === "SHORTLISTED"
-                      ? "bg-teal-500 text-white"
-                      : app.status === "REJECTED"
-                      ? "bg-destructive text-destructive-foreground"
-                      : "bg-secondary text-secondary-foreground"
+                      ? "bg-teal-400 text-white"
+                      : app.status === "INTERVIEW_SCHEDULED"
+                        ? "bg-teal-600 text-white"
+                        : app.status === "SELECTED"
+                          ? "bg-teal-800 text-white"
+                          : app.status === "REJECTED"
+                            ? "bg-destructive text-destructive-foreground"
+                            : "bg-secondary text-secondary-foreground"
                   }
                 >
-                  {app.status}
+                  {app.status.replace("_", " ")}
                 </Badge>
               </CardContent>
             </Card>
@@ -277,7 +291,7 @@ export default function StartupApplicants() {
                     {selectedApplicant.candidateName}
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    {selectedApplicant.role}
+                    {selectedApplicant.jobTitle}
                   </p>
                 </div>
 

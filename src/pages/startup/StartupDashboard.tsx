@@ -33,22 +33,86 @@ import { SelectionModal } from "@/components/startup/SelectionModal";
 import { EditStartupProfileModal } from "@/components/startup/EditStartupProfileModal";
 
 const stats = [
-  { label: "Active Jobs", value: "5", icon: Briefcase, trend: "+2 this week", color: "bg-accent/10 text-accent" },
-  { label: "Total Applicants", value: "127", icon: Users, trend: "+34 this week", color: "bg-success/10 text-success" },
-  { label: "Profile Views", value: "892", icon: Eye, trend: "+156 this week", color: "bg-warning/10 text-warning" },
+  {
+    label: "Active Jobs",
+    value: "5",
+    icon: Briefcase,
+    trend: "+2 this week",
+    color: "bg-accent/10 text-accent",
+  },
+  {
+    label: "Total Applicants",
+    value: "127",
+    icon: Users,
+    trend: "+34 this week",
+    color: "bg-success/10 text-success",
+  },
+  {
+    label: "Profile Views",
+    value: "892",
+    icon: Eye,
+    trend: "+156 this week",
+    color: "bg-warning/10 text-warning",
+  },
 ];
 
 const recentApplications = [
-  { id: 1, name: "Priya Sharma", role: "Frontend Developer", avatar: "PS", time: "2h ago", status: "New" },
-  { id: 2, name: "Arjun Patel", role: "Backend Engineer", avatar: "AP", time: "4h ago", status: "Reviewed" },
-  { id: 3, name: "Meera Gupta", role: "Product Manager", avatar: "MG", time: "6h ago", status: "Shortlisted" },
-  { id: 4, name: "Rahul Kumar", role: "Data Analyst", avatar: "RK", time: "1d ago", status: "New" },
+  {
+    id: 1,
+    name: "Priya Sharma",
+    role: "Frontend Developer",
+    avatar: "PS",
+    time: "2h ago",
+    status: "New",
+  },
+  {
+    id: 2,
+    name: "Arjun Patel",
+    role: "Backend Engineer",
+    avatar: "AP",
+    time: "4h ago",
+    status: "Reviewed",
+  },
+  {
+    id: 3,
+    name: "Meera Gupta",
+    role: "Product Manager",
+    avatar: "MG",
+    time: "6h ago",
+    status: "Shortlisted",
+  },
+  {
+    id: 4,
+    name: "Rahul Kumar",
+    role: "Data Analyst",
+    avatar: "RK",
+    time: "1d ago",
+    status: "New",
+  },
 ];
 
 const activeJobs = [
-  { id: 1, title: "Frontend Developer", applicants: 45, status: "Active", posted: "5 days ago" },
-  { id: 2, title: "Backend Engineer", applicants: 32, status: "Active", posted: "1 week ago" },
-  { id: 3, title: "Product Manager", applicants: 28, status: "Active", posted: "2 weeks ago" },
+  {
+    id: 1,
+    title: "Frontend Developer",
+    applicants: 45,
+    status: "Active",
+    posted: "5 days ago",
+  },
+  {
+    id: 2,
+    title: "Backend Engineer",
+    applicants: 32,
+    status: "Active",
+    posted: "1 week ago",
+  },
+  {
+    id: 3,
+    title: "Product Manager",
+    applicants: 28,
+    status: "Active",
+    posted: "2 weeks ago",
+  },
 ];
 
 export default function StartupDashboard() {
@@ -58,7 +122,10 @@ export default function StartupDashboard() {
   const [interviewModalOpen, setInterviewModalOpen] = useState(false);
   const [selectionModalOpen, setSelectionModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
-  const [selectedApplicant, setSelectedApplicant] = useState({ name: "", id: "" });
+  const [selectedApplicant, setSelectedApplicant] = useState({
+    name: "",
+    id: "",
+  });
 
   const handleScheduleInterview = (applicant: { name: string; id: number }) => {
     setSelectedApplicant({ name: applicant.name, id: `APP-${applicant.id}` });
@@ -76,7 +143,7 @@ export default function StartupDashboard() {
         {/* Welcome header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div 
+            <div
               className="h-16 w-16 rounded-2xl bg-accent/10 flex items-center justify-center font-bold text-accent text-2xl cursor-pointer hover:bg-accent/20 transition-colors"
               onClick={() => setProfileModalOpen(true)}
             >
@@ -84,15 +151,25 @@ export default function StartupDashboard() {
             </div>
             <div>
               <h1 className="text-3xl font-bold text-foreground">TechCorp</h1>
-              <p className="text-muted-foreground">Welcome back! Here's your hiring overview.</p>
+              <p className="text-muted-foreground">
+                Welcome back! Here's your hiring overview.
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setProfileModalOpen(true)} className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setProfileModalOpen(true)}
+              className="gap-2"
+            >
               <Building className="h-4 w-4" />
               Edit Profile
             </Button>
-            <Button variant="hero" className="gap-2" onClick={() => setJobModalOpen(true)}>
+            <Button
+              variant="hero"
+              className="gap-2"
+              onClick={() => setJobModalOpen(true)}
+            >
               <Plus className="h-4 w-4" />
               Post New Job
             </Button>
@@ -106,37 +183,51 @@ export default function StartupDashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+             
               <Button
                 variant="outline"
-                className="h-auto py-4 flex-col gap-2"
+                className="group h-auto py-4 flex-col gap-2 hover:bg-accent hover:text-white"
                 onClick={() => setJobModalOpen(true)}
               >
-                <Briefcase className="h-5 w-5 text-accent" />
-                <span>Post Job</span>
+                <Briefcase className="h-5 w-5 text-accent group-hover:text-white transition-colors" />
+                <span className="group-hover:text-white transition-colors">
+                  Post Job
+                </span>
               </Button>
+
+             
+
               <Button
                 variant="outline"
-                className="h-auto py-4 flex-col gap-2"
-                onClick={() => (true)}
+                className="group h-auto py-4 flex-col gap-2 hover:bg-accent hover:text-white"
+                onClick={() => setPostModalOpen(true)}
               >
-                <FileText className="h-5 w-5 text-accent" />
-                <span>Create Post</span>
+                <FileText className="h-5 w-5 text-accent group-hover:text-white transition-colors" />
+                <span className="group-hover:text-white transition-colors">
+                  Create Post
+                </span>
               </Button>
+
               <Button
                 variant="outline"
-                className="h-auto py-4 flex-col gap-2"
+                className="group h-auto py-4 flex-col gap-2 hover:bg-accent hover:text-white"
                 onClick={() => setPollModalOpen(true)}
               >
-                <HelpCircle className="h-5 w-5 text-accent" />
-                <span>Create Poll</span>
+                <HelpCircle className="h-5 w-5 text-accent group-hover:text-white transition-colors" />
+                <span className="group-hover:text-white transition-colors">
+                  Create Poll
+                </span>
               </Button>
+
               <Button
                 variant="outline"
-                className="h-auto py-4 flex-col gap-2"
+                className="group h-auto py-4 flex-col gap-2 hover:bg-accent hover:text-white"
                 onClick={() => setProfileModalOpen(true)}
               >
-                <Building className="h-5 w-5 text-accent" />
-                <span>Edit Profile</span>
+                <Building className="h-5 w-5 text-accent group-hover:text-white transition-colors" />
+                <span className="group-hover:text-white transition-colors">
+                  Edit Profile
+                </span>
               </Button>
             </div>
           </CardContent>
@@ -149,14 +240,18 @@ export default function StartupDashboard() {
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-muted-foreground text-sm">{stat.label}</p>
+                    <p className="text-muted-foreground text-sm">
+                      {stat.label}
+                    </p>
                     <p className="text-4xl font-bold mt-2">{stat.value}</p>
                     <div className="flex items-center gap-1 mt-2 text-sm text-success">
                       <TrendingUp className="h-4 w-4" />
                       {stat.trend}
                     </div>
                   </div>
-                  <div className={`h-12 w-12 rounded-xl ${stat.color} flex items-center justify-center`}>
+                  <div
+                    className={`h-12 w-12 rounded-xl ${stat.color} flex items-center justify-center`}
+                  >
                     <stat.icon className="h-6 w-6" />
                   </div>
                 </div>
@@ -191,15 +286,17 @@ export default function StartupDashboard() {
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold">{app.name}</p>
-                      <p className="text-sm text-muted-foreground">{app.role}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {app.role}
+                      </p>
                     </div>
                     <Badge
                       variant={
                         app.status === "New"
                           ? "accent"
                           : app.status === "Shortlisted"
-                          ? "success"
-                          : "muted"
+                            ? "success"
+                            : "muted"
                       }
                     >
                       {app.status}
@@ -214,7 +311,9 @@ export default function StartupDashboard() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleScheduleInterview(app)}>
+                        <DropdownMenuItem
+                          onClick={() => handleScheduleInterview(app)}
+                        >
                           <Calendar className="h-4 w-4 mr-2" />
                           Schedule Interview
                         </DropdownMenuItem>
@@ -267,19 +366,22 @@ export default function StartupDashboard() {
       <CreateJobModal open={jobModalOpen} onOpenChange={setJobModalOpen} />
       <CreatePostModal open={postModalOpen} onOpenChange={setPostModalOpen} />
       <CreatePollModal open={pollModalOpen} onOpenChange={setPollModalOpen} />
-      <ScheduleInterviewModal 
-        open={interviewModalOpen} 
+      <ScheduleInterviewModal
+        open={interviewModalOpen}
         onOpenChange={setInterviewModalOpen}
         applicantName={selectedApplicant.name}
         applicationId={selectedApplicant.id}
       />
-      <SelectionModal 
-        open={selectionModalOpen} 
+      <SelectionModal
+        open={selectionModalOpen}
         onOpenChange={setSelectionModalOpen}
         applicantName={selectedApplicant.name}
         applicationId={selectedApplicant.id}
       />
-      <EditStartupProfileModal open={profileModalOpen} onOpenChange={setProfileModalOpen} />
+      <EditStartupProfileModal
+        open={profileModalOpen}
+        onOpenChange={setProfileModalOpen}
+      />
     </StartupLayout>
   );
 }
