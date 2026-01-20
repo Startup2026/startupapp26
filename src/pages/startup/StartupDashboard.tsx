@@ -4,14 +4,12 @@ import {
   Users,
   Eye,
   TrendingUp,
-  Plus,
-  MoreHorizontal,
   ArrowUpRight,
-  FileText,
-  HelpCircle,
   Calendar,
-  ClipboardCheck,
   Building,
+  CheckCircle,
+  Clock,
+  UserCheck,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { StartupLayout } from "@/components/layouts/StartupLayout";
@@ -19,17 +17,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { CreateJobModal } from "@/components/startup/CreateJobModal";
-import { CreatePostModal } from "@/components/startup/CreatePostModal";
-import { CreatePollModal } from "@/components/startup/CreatePollModal";
-import { ScheduleInterviewModal } from "@/components/startup/ScheduleInterviewModal";
-import { SelectionModal } from "@/components/startup/SelectionModal";
 import { EditStartupProfileModal } from "@/components/startup/EditStartupProfileModal";
 
 const stats = [
@@ -53,6 +40,13 @@ const stats = [
     icon: Eye,
     trend: "+156 this week",
     color: "bg-warning/10 text-warning",
+  },
+  {
+    label: "Interviews Scheduled",
+    value: "12",
+    icon: Calendar,
+    trend: "+5 this week",
+    color: "bg-primary/10 text-primary",
   },
 ];
 
@@ -115,27 +109,35 @@ const activeJobs = [
   },
 ];
 
+const upcomingInterviews = [
+  {
+    id: 1,
+    candidateName: "Neha Patil",
+    position: "Frontend Developer",
+    date: "Today",
+    time: "2:00 PM",
+    mode: "Online",
+  },
+  {
+    id: 2,
+    candidateName: "Amit Sharma",
+    position: "Backend Engineer",
+    date: "Tomorrow",
+    time: "10:30 AM",
+    mode: "In-Person",
+  },
+  {
+    id: 3,
+    candidateName: "Priya Kulkarni",
+    position: "Product Manager",
+    date: "Jan 22",
+    time: "3:00 PM",
+    mode: "Online",
+  },
+];
+
 export default function StartupDashboard() {
-  const [jobModalOpen, setJobModalOpen] = useState(false);
-  const [postModalOpen, setPostModalOpen] = useState(false);
-  const [pollModalOpen, setPollModalOpen] = useState(false);
-  const [interviewModalOpen, setInterviewModalOpen] = useState(false);
-  const [selectionModalOpen, setSelectionModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
-  const [selectedApplicant, setSelectedApplicant] = useState({
-    name: "",
-    id: "",
-  });
-
-  const handleScheduleInterview = (applicant: { name: string; id: number }) => {
-    setSelectedApplicant({ name: applicant.name, id: `APP-${applicant.id}` });
-    setInterviewModalOpen(true);
-  };
-
-  const handleSelection = (applicant: { name: string; id: number }) => {
-    setSelectedApplicant({ name: applicant.name, id: `APP-${applicant.id}` });
-    setSelectionModalOpen(true);
-  };
 
   return (
     <StartupLayout>
@@ -165,76 +167,11 @@ export default function StartupDashboard() {
               <Building className="h-4 w-4" />
               Edit Profile
             </Button>
-            <Button
-              variant="hero"
-              className="gap-2"
-              onClick={() => setJobModalOpen(true)}
-            >
-              <Plus className="h-4 w-4" />
-              Post New Job
-            </Button>
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-             
-              <Button
-                variant="outline"
-                className="group h-auto py-4 flex-col gap-2 hover:bg-accent hover:text-white"
-                onClick={() => setJobModalOpen(true)}
-              >
-                <Briefcase className="h-5 w-5 text-accent group-hover:text-white transition-colors" />
-                <span className="group-hover:text-white transition-colors">
-                  Post Job
-                </span>
-              </Button>
-
-             
-
-              <Button
-                variant="outline"
-                className="group h-auto py-4 flex-col gap-2 hover:bg-accent hover:text-white"
-                onClick={() => setPostModalOpen(true)}
-              >
-                <FileText className="h-5 w-5 text-accent group-hover:text-white transition-colors" />
-                <span className="group-hover:text-white transition-colors">
-                  Create Post
-                </span>
-              </Button>
-
-              <Button
-                variant="outline"
-                className="group h-auto py-4 flex-col gap-2 hover:bg-accent hover:text-white"
-                onClick={() => setPollModalOpen(true)}
-              >
-                <HelpCircle className="h-5 w-5 text-accent group-hover:text-white transition-colors" />
-                <span className="group-hover:text-white transition-colors">
-                  Create Poll
-                </span>
-              </Button>
-
-              <Button
-                variant="outline"
-                className="group h-auto py-4 flex-col gap-2 hover:bg-accent hover:text-white"
-                onClick={() => setProfileModalOpen(true)}
-              >
-                <Building className="h-5 w-5 text-accent group-hover:text-white transition-colors" />
-                <span className="group-hover:text-white transition-colors">
-                  Edit Profile
-                </span>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((stat) => (
             <Card key={stat.label} variant="elevated">
               <CardContent className="p-6">
@@ -260,23 +197,27 @@ export default function StartupDashboard() {
           ))}
         </div>
 
+        {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Recent applications */}
+          {/* Recent Applications */}
           <div className="lg:col-span-2">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle>Recent Applications</CardTitle>
-                <Link to="/startup/applicants">
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-accent" />
+                  Recent Applications
+                </CardTitle>
+                <Link to="/startup/jobs">
                   <Button variant="ghost" size="sm" className="gap-1">
                     View all <ArrowUpRight className="h-4 w-4" />
                   </Button>
                 </Link>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-3">
                 {recentApplications.map((app) => (
                   <div
                     key={app.id}
-                    className="flex items-center gap-4 p-4 rounded-lg hover:bg-muted/50 transition-colors"
+                    className="flex items-center gap-4 p-4 rounded-lg hover:bg-muted/50 transition-colors border border-transparent hover:border-border"
                   >
                     <Avatar className="h-12 w-12">
                       <AvatarImage src="" />
@@ -304,80 +245,140 @@ export default function StartupDashboard() {
                     <span className="text-sm text-muted-foreground hidden md:block">
                       {app.time}
                     </span>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => handleScheduleInterview(app)}
-                        >
-                          <Calendar className="h-4 w-4 mr-2" />
-                          Schedule Interview
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleSelection(app)}>
-                          <ClipboardCheck className="h-4 w-4 mr-2" />
-                          Make Selection
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
                   </div>
                 ))}
               </CardContent>
             </Card>
           </div>
 
-          {/* Active jobs */}
+          {/* Active Jobs */}
           <div>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle>Active Jobs</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Briefcase className="h-5 w-5 text-accent" />
+                  Active Jobs
+                </CardTitle>
                 <Link to="/startup/jobs">
                   <Button variant="ghost" size="sm" className="gap-1">
                     Manage <ArrowUpRight className="h-4 w-4" />
                   </Button>
                 </Link>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-3">
                 {activeJobs.map((job) => (
-                  <div
+                  <Link
                     key={job.id}
-                    className="p-4 rounded-lg border border-border hover:border-accent/50 transition-colors cursor-pointer"
+                    to={`/startup/jobs/${job.id}/applications`}
+                    className="block p-4 rounded-lg border border-border hover:border-accent/50 transition-colors cursor-pointer"
                   >
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold">{job.title}</h4>
                       <Badge variant="success">{job.status}</Badge>
                     </div>
                     <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <span>{job.applicants} applicants</span>
+                      <span className="flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        {job.applicants} applicants
+                      </span>
                       <span>{job.posted}</span>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </CardContent>
             </Card>
           </div>
         </div>
+
+        {/* Upcoming Interviews & Pipeline Stats */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Upcoming Interviews */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-accent" />
+                Upcoming Interviews
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {upcomingInterviews.map((interview) => (
+                <div
+                  key={interview.id}
+                  className="flex items-center gap-4 p-4 rounded-lg bg-muted/30 border border-border"
+                >
+                  <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center">
+                    <Clock className="h-5 w-5 text-accent" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium">{interview.candidateName}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {interview.position}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-medium">{interview.date}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {interview.time} • {interview.mode}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Pipeline Summary */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2">
+                <UserCheck className="h-5 w-5 text-accent" />
+                Hiring Pipeline
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/50">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-secondary flex items-center justify-center">
+                      <Users className="h-4 w-4 text-secondary-foreground" />
+                    </div>
+                    <span className="font-medium">Applied</span>
+                  </div>
+                  <span className="text-2xl font-bold">89</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-accent/10">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-accent/20 flex items-center justify-center">
+                      <CheckCircle className="h-4 w-4 text-accent" />
+                    </div>
+                    <span className="font-medium">Shortlisted</span>
+                  </div>
+                  <span className="text-2xl font-bold text-accent">24</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-warning/10">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-warning/20 flex items-center justify-center">
+                      <Calendar className="h-4 w-4 text-warning" />
+                    </div>
+                    <span className="font-medium">Interview</span>
+                  </div>
+                  <span className="text-2xl font-bold text-warning">12</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-success/10">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-success/20 flex items-center justify-center">
+                      <UserCheck className="h-4 w-4 text-success" />
+                    </div>
+                    <span className="font-medium">Selected</span>
+                  </div>
+                  <span className="text-2xl font-bold text-success">8</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
-      {/* Modals */}
-      <CreateJobModal open={jobModalOpen} onOpenChange={setJobModalOpen} />
-      <CreatePostModal open={postModalOpen} onOpenChange={setPostModalOpen} />
-      <CreatePollModal open={pollModalOpen} onOpenChange={setPollModalOpen} />
-      <ScheduleInterviewModal
-        open={interviewModalOpen}
-        onOpenChange={setInterviewModalOpen}
-        applicantName={selectedApplicant.name}
-        applicationId={selectedApplicant.id}
-      />
-      <SelectionModal
-        open={selectionModalOpen}
-        onOpenChange={setSelectionModalOpen}
-        applicantName={selectedApplicant.name}
-        applicationId={selectedApplicant.id}
-      />
+      {/* Profile Modal */}
       <EditStartupProfileModal
         open={profileModalOpen}
         onOpenChange={setProfileModalOpen}

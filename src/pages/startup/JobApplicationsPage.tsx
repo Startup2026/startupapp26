@@ -149,13 +149,23 @@ export default function JobApplicationsPage() {
     rejected: applicants.filter((a) => a.status === "REJECTED").length,
   };
 
-  const emailCandidates = applicants
-    .filter((a) => selectedIds.length === 0 || selectedIds.includes(a.id))
-    .map((a) => ({ id: a.id, name: a.name, email: a.email, jobTitle: a.jobTitle }));
+  const emailCandidates = applicants.map((a) => ({
+    id: a.id,
+    name: a.name,
+    email: a.email,
+    status: a.status,
+    jobTitle: a.jobTitle,
+  }));
 
   const scheduleCandidates = applicants
     .filter((a) => a.status === "SHORTLISTED" || a.status === "APPLIED")
-    .map((a) => ({ id: a.id, name: a.name, email: a.email, jobTitle: a.jobTitle }));
+    .map((a) => ({
+      id: a.id,
+      name: a.name,
+      email: a.email,
+      status: a.status,
+      jobTitle: a.jobTitle,
+    }));
 
   return (
     <StartupLayout>
@@ -388,6 +398,7 @@ export default function JobApplicationsPage() {
           onOpenChange={setEmailModalOpen}
           candidates={emailCandidates}
           title="Send Email to Applicants"
+          preselectedIds={selectedIds}
         />
 
         {/* Interview Schedule Modal */}

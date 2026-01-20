@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -19,12 +18,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { Calendar, Clock, Video, MapPin, Loader2, Users } from "lucide-react";
+import { Calendar, Clock, Video, MapPin, Loader2 } from "lucide-react";
+import {
+  ApplicantSelectionTable,
+  SelectableCandidate,
+} from "./ApplicantSelectionTable";
 
 interface Candidate {
   id: string;
   name: string;
   email: string;
+  status?: string;
   jobTitle?: string;
 }
 
@@ -55,11 +59,20 @@ export function InterviewScheduleModal({
   });
   const [scheduling, setScheduling] = useState(false);
 
-  const toggleCandidate = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  };
+  // Reset state when modal opens
+  useEffect(() => {
+    if (open) {
+      setSelectedIds(preselectedId ? [preselectedId] : []);
+      setSchedule({
+        date: "",
+        time: "",
+        mode: "online",
+        location: "",
+        interviewer: "",
+        notes: "",
+      });
+    }
+  }, [open, preselectedId]);
 
   const handleSchedule = async () => {
     if (selectedIds.length === 0) {
@@ -81,31 +94,30 @@ export function InterviewScheduleModal({
     }
 
     setScheduling(true);
-    
+
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1500));
-    
+
     setScheduling(false);
     toast({
       title: "Interview Scheduled",
       description: `Scheduled ${selectedIds.length} interview(s). Email notifications sent.`,
     });
-    
+
     onOpenChange(false);
-    setSelectedIds([]);
-    setSchedule({
-      date: "",
-      time: "",
-      mode: "online",
-      location: "",
-      interviewer: "",
-      notes: "",
-    });
   };
+
+  // Convert candidates to selectable format
+  const selectableCandidates: SelectableCandidate[] = candidates.map((c) => ({
+    id: c.id,
+    name: c.name,
+    email: c.email,
+    status: c.status,
+  }));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5 text-accent" />
@@ -113,7 +125,7 @@ export function InterviewScheduleModal({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden flex flex-col gap-4">
+        <div className="flex-1 overflow-y-auto space-y-5 pr-1">
           {/* Schedule Type Toggle */}
           <div className="flex items-center gap-4 p-3 bg-muted/50 rounded-lg">
             <div className="flex items-center gap-2">
@@ -122,65 +134,54 @@ export function InterviewScheduleModal({
                 onCheckedChange={(checked) => setIsCommonSchedule(!!checked)}
                 id="common-schedule"
               />
-              <label htmlFor="common-schedule" className="text-sm font-medium cursor-pointer">
+              <label
+                htmlFor="common-schedule"
+                className="text-sm font-medium cursor-pointer"
+              >
                 Common schedule for all selected candidates
               </label>
             </div>
           </div>
 
-          {/* Candidate Selection */}
+          {/* Candidate Selection Table */}
           <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Select Candidates ({selectedIds.length})
-            </Label>
-            <ScrollArea className="h-28 border rounded-lg p-3">
-              <div className="space-y-2">
-                {candidates.map((candidate) => (
-                  <div
-                    key={candidate.id}
-                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <Checkbox
-                      checked={selectedIds.includes(candidate.id)}
-                      onCheckedChange={() => toggleCandidate(candidate.id)}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{candidate.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {candidate.email}
-                        {candidate.jobTitle && ` • ${candidate.jobTitle}`}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
+            <Label className="text-sm font-medium">Select Candidates</Label>
+            <ApplicantSelectionTable
+              candidates={selectableCandidates}
+              selectedIds={selectedIds}
+              onSelectionChange={setSelectedIds}
+              showStatus={true}
+              maxHeight="200px"
+            />
           </div>
 
           {/* Schedule Details */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
+                <Calendar className="h-4 w-4 text-muted-foreground" />
                 Date
               </Label>
               <Input
                 type="date"
                 value={schedule.date}
-                onChange={(e) => setSchedule({ ...schedule, date: e.target.value })}
+                onChange={(e) =>
+                  setSchedule({ ...schedule, date: e.target.value })
+                }
               />
             </div>
 
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
+                <Clock className="h-4 w-4 text-muted-foreground" />
                 Time
               </Label>
               <Input
                 type="time"
                 value={schedule.time}
-                onChange={(e) => setSchedule({ ...schedule, time: e.target.value })}
+                onChange={(e) =>
+                  setSchedule({ ...schedule, time: e.target.value })
+                }
               />
             </div>
 
@@ -216,18 +217,22 @@ export function InterviewScheduleModal({
               <Label>Interviewer</Label>
               <Input
                 value={schedule.interviewer}
-                onChange={(e) => setSchedule({ ...schedule, interviewer: e.target.value })}
+                onChange={(e) =>
+                  setSchedule({ ...schedule, interviewer: e.target.value })
+                }
                 placeholder="Interviewer name"
               />
             </div>
 
-            <div className="col-span-2 space-y-2">
+            <div className="sm:col-span-2 space-y-2">
               <Label>
                 {schedule.mode === "online" ? "Meeting Link" : "Location"}
               </Label>
               <Input
                 value={schedule.location}
-                onChange={(e) => setSchedule({ ...schedule, location: e.target.value })}
+                onChange={(e) =>
+                  setSchedule({ ...schedule, location: e.target.value })
+                }
                 placeholder={
                   schedule.mode === "online"
                     ? "https://meet.google.com/..."
@@ -236,22 +241,31 @@ export function InterviewScheduleModal({
               />
             </div>
 
-            <div className="col-span-2 space-y-2">
+            <div className="sm:col-span-2 space-y-2">
               <Label>Notes / Instructions</Label>
               <Textarea
                 value={schedule.notes}
-                onChange={(e) => setSchedule({ ...schedule, notes: e.target.value })}
+                onChange={(e) =>
+                  setSchedule({ ...schedule, notes: e.target.value })
+                }
                 placeholder="Additional instructions for the candidate..."
                 className="resize-none"
                 rows={3}
               />
             </div>
           </div>
+        </div>
 
-          {/* Schedule Button */}
+        {/* Schedule Button */}
+        <div className="pt-4 border-t mt-4">
           <Button
             onClick={handleSchedule}
-            disabled={scheduling || selectedIds.length === 0 || !schedule.date || !schedule.time}
+            disabled={
+              scheduling ||
+              selectedIds.length === 0 ||
+              !schedule.date ||
+              !schedule.time
+            }
             className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
           >
             {scheduling ? (
@@ -262,7 +276,8 @@ export function InterviewScheduleModal({
             ) : (
               <>
                 <Calendar className="h-4 w-4 mr-2" />
-                Schedule {selectedIds.length} Interview{selectedIds.length !== 1 ? "s" : ""}
+                Schedule {selectedIds.length} Interview
+                {selectedIds.length !== 1 ? "s" : ""}
               </>
             )}
           </Button>
