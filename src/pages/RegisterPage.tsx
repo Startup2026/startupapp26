@@ -75,7 +75,7 @@ export default function RegisterPage() {
             <span className="text-accent">journey today</span>
           </h1>
           <p className="mt-6 text-lg text-primary-foreground/80 max-w-md">
-            Join thousands of students and startups already connecting on PitchIt.
+            Join thousands of students and startups already connecting on Wostup.
             Your next opportunity is just a sign-up away.
           </p>
 

@@ -81,7 +81,7 @@ const Index = () => {
           </h1>
 
           <p className="mt-6 text-xl text-muted-foreground max-w-2xl mx-auto animate-slide-up" style={{ animationDelay: "0.1s" }}>
-            PitchIt bridges the gap between ambitious students seeking opportunities
+            Wostup bridges the gap between ambitious students seeking opportunities
             and innovative startups looking for fresh talent.
           </p>
 
@@ -116,7 +116,7 @@ const Index = () => {
         <div className="container mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-foreground">
-              Why choose PitchIt?
+              Why choose Wostup?
             </h2>
             <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
               We're not just a job board. We're a community connecting the next
@@ -196,7 +196,7 @@ const Index = () => {
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <Logo size="sm" />
             <p className="text-sm text-muted-foreground">
-              © 2024 PitchIt. All rights reserved.
+              © 2024 Wostup. All rights reserved.
             </p>
             <div className="flex gap-6 text-sm text-muted-foreground">
               <a href="#" className="hover:text-foreground transition-colors">

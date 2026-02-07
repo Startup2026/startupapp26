@@ -29,6 +29,7 @@ export async function apiFetch<T>(
   options: RequestInit = {}
 ): Promise<{ success: boolean; data?: T; error?: string; status?: number; [key: string]: any }> {
   const token = getAuthToken();
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   
   // DEBUG: Warn if token is missing for authenticated requests
   if (!token) {
@@ -36,7 +37,7 @@ export async function apiFetch<T>(
   }
 
   const headers: HeadersInit = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(token && { Authorization: `Bearer ${token}` }),
     ...options.headers,
   };

@@ -70,7 +70,7 @@ export default function LoginPage() {
             <span className="text-accent">innovative startups</span>
           </h1>
           <p className="mt-6 text-lg text-primary-foreground/80 max-w-md">
-            PitchIt bridges the gap between ambitious students and groundbreaking
+            Wostup bridges the gap between ambitious students and groundbreaking
             startups. Find your next opportunity or discover fresh talent.
           </p>
           
@@ -171,7 +171,7 @@ export default function LoginPage() {
           </form>
 
           <p className="mt-8 text-center text-sm text-muted-foreground">
-            New to PitchIt?{" "}
+            New to Wostup?{" "}
             <button
               onClick={() => navigate("/register")}
               className="text-accent hover:text-accent/80 font-medium transition-colors"

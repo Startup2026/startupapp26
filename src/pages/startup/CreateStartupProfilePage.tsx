@@ -92,7 +92,7 @@ export default function CreateStartupProfilePage() {
       if (result.success) {
         toast({
           title: "Profile Created!",
-          description: "Welcome to PitchIt. Your startup profile is now live.",
+          description: "Welcome to Wostup. Your startup profile is now live.",
         });
         navigate("/startup/dashboard");
       } else {

@@ -6,7 +6,6 @@ import {
   MapPin,
   GraduationCap,
   Briefcase,
-  Upload,
   FileText,
   Edit2,
   Save,
@@ -48,6 +47,7 @@ const initialProfile = {
     linkedin: "",
     portfolio: "",
   },
+  profilepic: "",
   resume: "",
   _id: "",
 };
@@ -61,6 +61,36 @@ export default function StudentProfilePage() {
   const [newInterest, setNewInterest] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [profilepicFile, setProfilepicFile] = useState<File | null>(null);
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+
+  const mapApiProfile = (apiProfile: StudentProfile) => ({
+    firstName: apiProfile.firstName || "",
+    lastName: apiProfile.lastName || "",
+    email: apiProfile.email || "",
+    phone: apiProfile.phone || "",
+    location: apiProfile.location || "",
+    bio: apiProfile.bio || "",
+    college: apiProfile.education?.[0]?.institution || "",
+    degree: `${apiProfile.education?.[0]?.degree || ""} ${apiProfile.education?.[0]?.field || ""}`.trim(),
+    graduationYear: apiProfile.education?.[0]?.endYear || "",
+    skills: apiProfile.skills || [],
+    interests: apiProfile.interests || [],
+    experience: (apiProfile.experience || []).map((exp: any, idx: number) => ({
+      id: idx,
+      title: exp.title || "",
+      company: exp.company || "",
+      duration: exp.duration || "",
+    })),
+    links: {
+      github: apiProfile.githubUrl || "",
+      linkedin: apiProfile.linkedinUrl || "",
+      portfolio: apiProfile.portfolioUrl || "",
+    },
+    profilepic: apiProfile.profilepic || "",
+    resume: apiProfile.resumeUrl || "",
+    _id: apiProfile._id,
+  });
 
   // Fetch profile on mount
   useEffect(() => {
@@ -69,33 +99,7 @@ export default function StudentProfilePage() {
       try {
         const result = await studentProfileService.getMyProfile();
         if (result.success && result.data) {
-          const apiProfile = result.data;
-          const mappedProfile = {
-            firstName: apiProfile.firstName || "",
-            lastName: apiProfile.lastName || "",
-            email: apiProfile.email || "",
-            phone: apiProfile.phone || "",
-            location: apiProfile.location || "",
-            bio: apiProfile.bio || "",
-            college: apiProfile.education?.[0]?.institution || "",
-            degree: `${apiProfile.education?.[0]?.degree || ""} ${apiProfile.education?.[0]?.field || ""}`.trim(),
-            graduationYear: apiProfile.education?.[0]?.endYear || "",
-            skills: apiProfile.skills || [],
-            interests: apiProfile.interests || [],
-            experience: (apiProfile.experience || []).map((exp: any, idx: number) => ({
-              id: idx,
-              title: exp.title || "",
-              company: exp.company || "",
-              duration: exp.duration || "",
-            })),
-            links: {
-              github: apiProfile.githubUrl || "",
-              linkedin: apiProfile.linkedinUrl || "",
-              portfolio: apiProfile.portfolioUrl || "",
-            },
-            resume: apiProfile.resumeUrl || "",
-            _id: apiProfile._id,
-          };
+          const mappedProfile = mapApiProfile(result.data);
           setProfile(mappedProfile);
           setEditedProfile(mappedProfile);
         }
@@ -133,31 +137,49 @@ export default function StudentProfilePage() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const updateData = {
-        firstName: editedProfile.firstName,
-        lastName: editedProfile.lastName,
-        email: editedProfile.email,
-        phone: editedProfile.phone,
-        location: editedProfile.location,
-        bio: editedProfile.bio,
-        skills: editedProfile.skills,
-        interests: editedProfile.interests,
-        githubUrl: editedProfile.links.github,
-        linkedinUrl: editedProfile.links.linkedin,
-        portfolioUrl: editedProfile.links.portfolio,
-        education: [{
-          institution: editedProfile.college,
-          degree: editedProfile.degree.split(" ")[0] || "",
-          field: editedProfile.degree.split(" ").slice(1).join(" ") || "",
-          startYear: "",
-          endYear: editedProfile.graduationYear,
-        }],
-      };
+      const updateData = new FormData();
+      updateData.append("firstName", editedProfile.firstName);
+      updateData.append("lastName", editedProfile.lastName);
+      updateData.append("email", editedProfile.email);
+      updateData.append("phone", editedProfile.phone);
+      updateData.append("location", editedProfile.location);
+      updateData.append("bio", editedProfile.bio);
+      updateData.append("githubUrl", editedProfile.links.github);
+      updateData.append("linkedinUrl", editedProfile.links.linkedin);
+      updateData.append("portfolioUrl", editedProfile.links.portfolio);
+      updateData.append("skills", JSON.stringify(editedProfile.skills));
+      updateData.append("interests", JSON.stringify(editedProfile.interests));
+      updateData.append(
+        "experience",
+        JSON.stringify(editedProfile.experience.map(({ id, ...rest }) => rest))
+      );
+      updateData.append(
+        "education",
+        JSON.stringify([
+          {
+            institution: editedProfile.college,
+            degree: editedProfile.degree.split(" ")[0] || "",
+            field: editedProfile.degree.split(" ").slice(1).join(" ") || "",
+            startYear: "",
+            endYear: editedProfile.graduationYear,
+          },
+        ])
+      );
+      if (profilepicFile) updateData.append("profilepic", profilepicFile);
+      if (resumeFile) updateData.append("resume", resumeFile);
 
-      const result = await studentProfileService.updateProfile(profile._id, updateData);
+      const result = await studentProfileService.updateMyProfile(updateData);
       
       if (result.success) {
-        setProfile(editedProfile);
+        if (result.data) {
+          const mappedProfile = mapApiProfile(result.data);
+          setProfile(mappedProfile);
+          setEditedProfile(mappedProfile);
+        } else {
+          setProfile(editedProfile);
+        }
+        setProfilepicFile(null);
+        setResumeFile(null);
         setIsEditing(false);
         toast({
           title: "Profile Updated",
@@ -293,8 +315,8 @@ export default function StudentProfilePage() {
               <CardContent className="p-6 text-center">
                 <div className="h-24 w-24 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-4">
                   <span className="text-3xl font-bold text-accent">
-                    {currentProfile.firstName[0]}
-                    {currentProfile.lastName[0]}
+                    {currentProfile.firstName?.[0] || ""}
+                    {currentProfile.lastName?.[0] || ""}
                   </span>
                 </div>
                 <h3 className="text-xl font-semibold">
@@ -302,10 +324,15 @@ export default function StudentProfilePage() {
                 </h3>
                 <p className="text-muted-foreground">{currentProfile.college}</p>
                 {isEditing && (
-                  <Button variant="outline" size="sm" className="mt-4">
-                    <Upload className="h-4 w-4 mr-2" />
-                    Change Photo
-                  </Button>
+                  <div className="space-y-2 mt-4">
+                    <Label htmlFor="profilepic" className="text-sm">Profile Photo</Label>
+                    <Input
+                      id="profilepic"
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setProfilepicFile(e.target.files?.[0] || null)}
+                    />
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -328,10 +355,15 @@ export default function StudentProfilePage() {
                   <p className="text-muted-foreground text-sm">No resume uploaded</p>
                 )}
                 {isEditing && (
-                  <Button variant="outline" className="w-full mt-4">
-                    <Upload className="h-4 w-4 mr-2" />
-                    {currentProfile.resume ? "Update Resume" : "Upload Resume"}
-                  </Button>
+                  <div className="space-y-2 mt-4">
+                    <Label htmlFor="resume" className="text-sm">Resume</Label>
+                    <Input
+                      id="resume"
+                      type="file"
+                      accept=".pdf,.doc,.docx"
+                      onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
+                    />
+                  </div>
                 )}
               </CardContent>
             </Card>

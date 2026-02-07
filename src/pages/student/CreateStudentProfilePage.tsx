@@ -31,6 +31,13 @@ export default function CreateStudentProfilePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newSkill, setNewSkill] = useState("");
   const [newInterest, setNewInterest] = useState("");
+  const [experienceDraft, setExperienceDraft] = useState({
+    title: "",
+    company: "",
+    duration: "",
+  });
+  const [profilepicFile, setProfilepicFile] = useState<File | null>(null);
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
 
   const [formData, setFormData] = useState({
     firstName: user?.name?.split(" ")[0] || "",
@@ -49,6 +56,7 @@ export default function CreateStudentProfilePage() {
     githubUrl: "",
     linkedinUrl: "",
     portfolioUrl: "",
+    experience: [] as { title: string; company: string; duration?: string }[],
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -78,25 +86,58 @@ export default function CreateStudentProfilePage() {
     setFormData((prev) => ({ ...prev, interests: prev.interests.filter((i) => i !== interest) }));
   };
 
+  const addExperience = () => {
+    const title = experienceDraft.title.trim();
+    const company = experienceDraft.company.trim();
+    const duration = experienceDraft.duration.trim();
+    if (!title || !company) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      experience: [...prev.experience, { title, company, duration: duration || undefined }],
+    }));
+    setExperienceDraft({ title: "", company: "", duration: "" });
+  };
+
+  const removeExperience = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      experience: prev.experience.filter((_, i) => i !== index),
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
+    if (!user?._id) {
+      toast({
+        title: "Not signed in",
+        description: "Please sign in again to create your profile.",
+        variant: "destructive",
+      });
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
-      const profileData = {
-        userId: user?._id || "",
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        phone: formData.phone,
-        location: formData.location,
-        bio: formData.bio,
-        skills: formData.skills,
-        interests: formData.interests,
-        githubUrl: formData.githubUrl,
-        linkedinUrl: formData.linkedinUrl,
-        portfolioUrl: formData.portfolioUrl,
-        education: [
+      const profileData = new FormData();
+      profileData.append("userId", user._id);
+      profileData.append("firstName", formData.firstName);
+      profileData.append("lastName", formData.lastName);
+      profileData.append("email", formData.email);
+      profileData.append("phone", formData.phone);
+      profileData.append("location", formData.location);
+      profileData.append("bio", formData.bio);
+      profileData.append("githubUrl", formData.githubUrl);
+      profileData.append("linkedinUrl", formData.linkedinUrl);
+      profileData.append("portfolioUrl", formData.portfolioUrl);
+      profileData.append("skills", JSON.stringify(formData.skills));
+      profileData.append("interests", JSON.stringify(formData.interests));
+      profileData.append("experience", JSON.stringify(formData.experience));
+      profileData.append(
+        "education",
+        JSON.stringify([
           {
             institution: formData.institution,
             degree: formData.degree,
@@ -104,15 +145,18 @@ export default function CreateStudentProfilePage() {
             startYear: formData.startYear,
             endYear: formData.endYear,
           },
-        ],
-      };
+        ])
+      );
+
+      if (profilepicFile) profileData.append("profilepic", profilepicFile);
+      if (resumeFile) profileData.append("resume", resumeFile);
 
       const result = await studentProfileService.createProfile(profileData);
 
       if (result.success) {
         toast({
           title: "Profile Created!",
-          description: "Welcome to PitchIt. Your profile is now set up.",
+          description: "Welcome to Wostup. Your profile is now set up.",
         });
         navigate("/student/dashboard");
       } else {
@@ -366,6 +410,96 @@ export default function CreateStudentProfilePage() {
                       </Badge>
                     ))}
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Experience */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Experience</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="expTitle">Title</Label>
+                    <Input
+                      id="expTitle"
+                      value={experienceDraft.title}
+                      onChange={(e) => setExperienceDraft((prev) => ({ ...prev, title: e.target.value }))}
+                      placeholder="e.g., Frontend Intern"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="expCompany">Company</Label>
+                    <Input
+                      id="expCompany"
+                      value={experienceDraft.company}
+                      onChange={(e) => setExperienceDraft((prev) => ({ ...prev, company: e.target.value }))}
+                      placeholder="e.g., TechFlow"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="expDuration">Duration</Label>
+                    <Input
+                      id="expDuration"
+                      value={experienceDraft.duration}
+                      onChange={(e) => setExperienceDraft((prev) => ({ ...prev, duration: e.target.value }))}
+                      placeholder="e.g., Jun 2024 - Aug 2024"
+                    />
+                  </div>
+                </div>
+                <Button type="button" variant="outline" onClick={addExperience}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Experience
+                </Button>
+
+                {formData.experience.length > 0 && (
+                  <div className="space-y-2">
+                    {formData.experience.map((exp, index) => (
+                      <div key={`${exp.title}-${index}`} className="flex items-center justify-between p-3 bg-secondary rounded-lg">
+                        <div>
+                          <p className="font-medium">{exp.title}</p>
+                          <p className="text-sm text-muted-foreground">{exp.company}</p>
+                          {exp.duration && (
+                            <p className="text-xs text-muted-foreground">{exp.duration}</p>
+                          )}
+                        </div>
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeExperience(index)}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Resume & Photo */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Resume & Photo</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="profilepic">Profile Photo</Label>
+                  <Input
+                    id="profilepic"
+                    name="profilepic"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setProfilepicFile(e.target.files?.[0] || null)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="resume">Resume</Label>
+                  <Input
+                    id="resume"
+                    name="resume"
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
+                  />
                 </div>
               </CardContent>
             </Card>

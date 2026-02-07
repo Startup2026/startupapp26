@@ -36,10 +36,10 @@ export interface CreateStudentProfileData {
 }
 
 export const studentProfileService = {
-  async createProfile(data: CreateStudentProfileData): Promise<{ success: boolean; data?: StudentProfile; error?: string }> {
+  async createProfile(data: CreateStudentProfileData | FormData): Promise<{ success: boolean; data?: StudentProfile; error?: string }> {
     return apiFetch<StudentProfile>('/student-profiles', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: data instanceof FormData ? data : JSON.stringify(data),
     });
   },
 
@@ -59,6 +59,13 @@ export const studentProfileService = {
     return apiFetch<StudentProfile>(`/student-profiles/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    });
+  },
+
+  async updateMyProfile(data: Partial<StudentProfile> | FormData): Promise<{ success: boolean; data?: StudentProfile; error?: string }> {
+    return apiFetch<StudentProfile>('/student-profiles/me', {
+      method: 'PUT',
+      body: data instanceof FormData ? data : JSON.stringify(data),
     });
   },
 
