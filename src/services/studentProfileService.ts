@@ -25,6 +25,7 @@ export interface StudentProfile {
   linkedinUrl?: string;
   githubUrl?: string;
   portfolioUrl?: string;
+  profilepic?: string;
 }
 
 export interface CreateStudentProfileData {

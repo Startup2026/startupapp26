@@ -11,11 +11,11 @@ import {
   LogOut,
   ChevronRight,
   Menu,
-  // Add these new icons
   UserCheck,
   UserPlus,
   BarChart3,
-  Calendar
+  Calendar,
+  TrendingUp
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,7 @@ const navItems = [
   { icon: UserCheck, label: "Shortlisted", href: "/startup/shortlisted" },
   { icon: UserPlus, label: "Selected", href: "/startup/selected" },
   { icon: BarChart3, label: "Analysis", href: "/startup/analysis" },
+  { icon: TrendingUp, label: "Social Analysis", href: "/startup/social-media-analysis" },
   { icon: Calendar, label: "Interviews", href: "/startup/interviews" },
   // ---
   // { icon: MessageSquare, label: "Updates", href: "/startup/updates" },
