@@ -1,17 +1,14 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Heart,
   MessageCircle,
   FileText,
   TrendingUp,
-  ArrowUpRight,
   Image,
   Video,
   CalendarDays,
   BarChart3,
-  Clock,
-  X,
-  Eye,
 } from "lucide-react";
 import {
   BarChart,
@@ -36,13 +33,6 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -154,7 +144,7 @@ function getWeekLabel(dateStr: string): string {
 /* -------------------- PAGE -------------------- */
 
 export default function SocialMediaAnalysisPage() {
-  const [selectedPost, setSelectedPost] = useState<typeof mockPosts[0] | null>(null);
+  const navigate = useNavigate();
 
   const analytics = useMemo(() => {
     const totalPosts = mockPosts.length;
@@ -407,10 +397,7 @@ export default function SocialMediaAnalysisPage() {
                       <TableRow
                         key={post._id}
                         className="cursor-pointer hover:bg-accent/5 transition-colors"
-                        onClick={() => {
-                          const full = mockPosts.find((p) => p._id === post._id);
-                          if (full) setSelectedPost(full);
-                        }}
+                        onClick={() => navigate(`/startup/posts/${post._id}`)}
                       >
                         <TableCell className="font-medium text-muted-foreground">
                           {i + 1}
@@ -482,12 +469,6 @@ export default function SocialMediaAnalysisPage() {
             </CardContent>
           </Card>
         </div>
-        {/* POST DETAIL DIALOG */}
-        <PostDetailDialog
-          post={selectedPost}
-          open={!!selectedPost}
-          onClose={() => setSelectedPost(null)}
-        />
       </div>
     </StartupLayout>
   );
@@ -510,119 +491,6 @@ function PostTypeBadge({ type }: { type: "photo" | "video" | "text" }) {
   );
 }
 
-function PostDetailDialog({
-  post,
-  open,
-  onClose,
-}: {
-  post: typeof mockPosts[0] | null;
-  open: boolean;
-  onClose: () => void;
-}) {
-  if (!post) return null;
-
-  const type = getPostType(post);
-  const engagement = post.likes.length + post.comments.length;
-  const created = new Date(post.createdAt);
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-xl">{post.title}</DialogTitle>
-        </DialogHeader>
-
-        {/* Media */}
-        {post.media?.photo && (
-          <img
-            src={post.media.photo}
-            alt={post.title}
-            className="w-full rounded-lg object-cover max-h-64"
-          />
-        )}
-        {post.media?.video && (
-          <div className="w-full rounded-lg bg-muted/50 flex items-center justify-center h-48">
-            <Video className="h-10 w-10 text-muted-foreground" />
-            <span className="ml-2 text-sm text-muted-foreground">Video content</span>
-          </div>
-        )}
-
-        {/* Description */}
-        <p className="text-sm text-muted-foreground leading-relaxed">{post.description}</p>
-
-        <Separator />
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-            <Heart className="h-4 w-4 text-destructive" />
-            <div>
-              <p className="text-xs text-muted-foreground">Likes</p>
-              <p className="text-lg font-bold">{post.likes.length}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-            <MessageCircle className="h-4 w-4 text-accent" />
-            <div>
-              <p className="text-xs text-muted-foreground">Comments</p>
-              <p className="text-lg font-bold">{post.comments.length}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-            <TrendingUp className="h-4 w-4 text-primary" />
-            <div>
-              <p className="text-xs text-muted-foreground">Engagement</p>
-              <p className="text-lg font-bold">{engagement}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-            <Eye className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">Post Type</p>
-              <p className="text-lg font-bold capitalize">{type}</p>
-            </div>
-          </div>
-        </div>
-
-        <Separator />
-
-        {/* Metadata */}
-        <div className="space-y-2 text-sm">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Clock className="h-4 w-4" />
-            <span>Posted on {created.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</span>
-          </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <CalendarDays className="h-4 w-4" />
-            <span>at {created.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}</span>
-          </div>
-        </div>
-
-        {/* Recent Comments */}
-        {post.comments.length > 0 && (
-          <>
-            <Separator />
-            <div>
-              <h4 className="text-sm font-semibold mb-3">Recent Comments ({post.comments.length})</h4>
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {post.comments.slice(0, 5).map((c, i) => (
-                  <div key={i} className="p-2 rounded bg-muted/30 text-sm">
-                    <span className="text-muted-foreground">{c.text}</span>
-                  </div>
-                ))}
-                {post.comments.length > 5 && (
-                  <p className="text-xs text-muted-foreground text-center">
-                    +{post.comments.length - 5} more comments
-                  </p>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 function FrequencyRow({
   label,
