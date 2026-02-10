@@ -1,48 +1,76 @@
 // src/contexts/AuthContext.tsx
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { authService, User } from '@/services/authService';
+import { getStoredUser, clearAuthToken } from '@/lib/api';
 
-// Extend the User interface to include the isVerified field
-interface User {
-    email: string;
-    password: string;
-    isVerified: boolean;  // New field for email verification status
-}
+type AuthContextValue = {
+    user: User | null;
+    login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+    register: (username: string, email: string, password: string, role: 'student' | 'startup' | 'admin') => Promise<{ success: boolean; error?: string }>;
+    logout: () => Promise<void>;
+    resendVerification: (email: string) => Promise<{ success: boolean; error?: string }>; 
+};
 
-const AuthContext = createContext(null);
+const AuthContext = createContext<AuthContextValue | null>(null);
 
-export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState<User | null>(null);
+export const AuthProvider: React.FC<any> = ({ children }) => {
+    const [user, setUser] = useState<User | null>(() => {
+        try {
+            return getStoredUser();
+        } catch {
+            return null;
+        }
+    });
+
+    useEffect(() => {
+        // Keep local user in sync with storage
+        const stored = getStoredUser();
+        if (stored && !user) setUser(stored);
+    }, []);
 
     const login = async (email: string, password: string) => {
-        // Logic to authenticate the user
-
-        const authenticatedUser = await authenticateUser(email, password);
-        if (authenticatedUser) {
-            if (!authenticatedUser.isVerified) {
-                throw new Error('Email is not verified. Please verify your email before logging in.');
-            }
-
-            setUser(authenticatedUser);
+        const result = await authService.login(email, password);
+        if (result.success && result.data) {
+            setUser(result.data.user);
+            return { success: true };
         }
+
+        // Generic error message for security, but pass through verify message if present
+        const message = result.error || 'Invalid credentials.';
+        return { success: false, error: message };
+    };
+
+    const register = async (username: string, email: string, password: string, role: 'student' | 'startup' | 'admin') => {
+        const result = await authService.register({ username, email, password, role });
+        if (result.success && result.data) {
+            // Do NOT auto-login; require email verification
+            return { success: true };
+        }
+        return { success: false, error: result.error || 'Registration failed' };
+    };
+
+    const logout = async () => {
+        await authService.logout();
+        clearAuthToken();
+        setUser(null);
+    };
+
+    const resendVerification = async (email: string) => {
+        const result = await authService.resendVerification(email);
+        if (result.success) return { success: true };
+        return { success: false, error: result.error || 'Unable to resend verification' };
     };
 
     return (
-        <AuthContext.Provider value={{ user, login }}>
+        <AuthContext.Provider value={{ user, login, register, logout, resendVerification }}>
             {children}
         </AuthContext.Provider>
     );
 };
 
-export const useAuth = () => useContext(AuthContext);
-
-// Assume this function connects to backend to authenticate
-const authenticateUser = async (email: string, password: string) => {
-    // Simulated backend request
-    return new Promise<User | null>((resolve) => {
-        setTimeout(() => {
-            // Simulated logged-in user object
-            resolve({ email, password, isVerified: true }); // Replace true with actual verification status
-        }, 1000);
-    });
+export const useAuth = () => {
+    const ctx = useContext(AuthContext);
+    if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+    return ctx;
 };

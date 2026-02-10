@@ -36,16 +36,12 @@ export default function RegisterPage() {
 
     if (result.success) {
       toast({
-        title: "Account created!",
-        description: "Let's set up your profile.",
+        title: "Verification email sent",
+        description: "Please check your inbox and verify your email before logging in.",
       });
 
-      // Redirect to profile creation page
-      if (role === "student") {
-        navigate("/student/create-profile");
-      } else {
-        navigate("/startup/create-profile");
-      }
+      // Take user to a verification pending page with resend option
+      navigate('/verify-pending', { state: { email, role } });
     } else {
       toast({
         title: "Registration failed",

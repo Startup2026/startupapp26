@@ -34,6 +34,21 @@ export const authService = {
     return result;
   },
 
+  async verifyEmail(email: string, token: string): Promise<{ success: boolean; error?: string }> {
+    // Calls universal verification endpoint using email + otp token
+    return apiFetch(`/auth/verify-email`, {
+      method: 'POST',
+      body: JSON.stringify({ email, token }),
+    });
+  },
+
+  async resendVerification(email: string): Promise<{ success: boolean; error?: string; status?: number }> {
+    return apiFetch('/auth/resend-verification', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
 async register(data: RegisterData): Promise<{ success: boolean; data?: User; error?: string }> {
     return apiFetch<User>('/auth/signup', {
       method: 'POST',
