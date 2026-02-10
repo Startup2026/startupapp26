@@ -7,6 +7,8 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import VerifyEmailPage from "./pages/VerifyEmailPage";
+import VerifyPendingPage from "./pages/VerifyPendingPage";
 import StudentDashboard from "./pages/student/StudentDashboard";
 import JobListingsPage from "./pages/student/JobListingsPage";
 import JobDetailsPage from "./pages/student/JobDetailsPage";
@@ -49,6 +51,8 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route path="/verify-pending" element={<VerifyPendingPage />} />
             
             {/* Student routes */}
             <Route path="/student/create-profile" element={<CreateStudentProfilePage />} />
