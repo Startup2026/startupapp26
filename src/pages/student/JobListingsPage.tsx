@@ -35,7 +35,7 @@ export default function JobListingsPage() {
           : await jobService.getColdStartJobs();
           
         if (res?.success) {
-          setJobs(res.data || []);
+          setJobs((res.data as any[]) || []);
         }
       } catch (error) {
         console.error("Failed to load jobs:", error);

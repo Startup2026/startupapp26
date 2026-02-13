@@ -1,18 +1,20 @@
 import { Rocket } from "lucide-react";
 
 interface LogoProps {
-  size?: "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
   showText?: boolean;
 }
 
 export function Logo({ size = "md", showText = true }: LogoProps) {
   const sizeClasses = {
+    xs: "h-6 w-6",
     sm: "h-8 w-8",
     md: "h-10 w-10",
     lg: "h-14 w-14",
   };
 
   const textSizeClasses = {
+    xs: "text-base",
     sm: "text-lg",
     md: "text-xl",
     lg: "text-3xl",

@@ -42,7 +42,7 @@ export default function SavedItemsPage() {
       
       if (postsRes.success) {
         // Filter posts that have the isSaved flag from the recommendation system
-        setSavedPosts(postsRes.data.filter((p: any) => p.isSaved));
+        setSavedPosts((postsRes.data as any[]).filter((p: any) => p.isSaved));
       }
     } catch (error) {
       console.error("Error fetching saved items:", error);

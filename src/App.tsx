@@ -8,6 +8,8 @@ import { SocketProvider } from "@/contexts/SocketContext";
 import Index from "./pages/Index";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import VerifyEmailPage from "./pages/VerifyEmailPage";
+import VerifyPendingPage from "./pages/VerifyPendingPage";
 import StudentDashboard from "./pages/student/StudentDashboard";
 import JobListingsPage from "./pages/student/JobListingsPage";
 import JobDetailsPage from "./pages/student/JobDetailsPage";
@@ -35,6 +37,8 @@ import Selected from "./pages/startup/Selected";
 import InterviewCalendarPage from "./pages/startup/InterviewCalendarPage";
 import JobAnalysisPage from "./pages/startup/JobAnalysisPage";
 import StartupSettingsPage from "./pages/startup/StartupSettingsPage";
+import SocialMediaAnalysisPage from "./pages/startup/SocialMediaAnalysisPage";
+import PostDetailPage from "./pages/startup/PostDetailPage";
 import TrendingJobsPage from "./pages/student/TrendingJobsPost";
 import SavedItemsPage from "./pages/student/SavePage";
 const queryClient = new QueryClient();
@@ -51,6 +55,8 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route path="/verify-pending" element={<VerifyPendingPage />} />
             
             {/* Student routes */}
             <Route path="/student/create-profile" element={<CreateStudentProfilePage />} />
@@ -72,6 +78,8 @@ const App = () => (
             <Route path="/startup/jobs" element={<StartupJobsPage />} />
             <Route path="/startup/jobs/:jobId/applications" element={<JobApplicationsPage />} />
             <Route path="/startup/analysis" element={<JobAnalysisPage />} />
+            <Route path="/startup/social-media-analysis" element={<SocialMediaAnalysisPage />} />
+            <Route path="/startup/posts/:postId" element={<PostDetailPage />} />
             <Route path="/startup/interviews" element={<InterviewCalendarPage />} />
             <Route path="/startup/profile" element={<StartupProfile />} />
             <Route path="/startup/shortlisted" element={<Shortlisted />} />
