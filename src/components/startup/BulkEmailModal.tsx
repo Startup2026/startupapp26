@@ -9,8 +9,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { Mail, Send, Loader2 } from "lucide-react";
+import { apiFetch } from "@/lib/api";
+import { Mail, Send, Loader2, Calendar } from "lucide-react";
 import { EmailTemplateSelector, EmailTemplate } from "./EmailTemplateSelector";
 import {
   ApplicantSelectionTable,
@@ -45,12 +54,24 @@ export function BulkEmailModal({
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
 
+  // Interview States
+  const [isInterview, setIsInterview] = useState(false);
+  const [interviewDate, setInterviewDate] = useState("");
+  const [interviewTime, setInterviewTime] = useState("");
+  const [interviewMode, setInterviewMode] = useState<"online" | "offline">("online");
+  const [interviewLink, setInterviewLink] = useState("");
+
   // Reset state when modal opens
   useEffect(() => {
     if (open) {
       setSelectedIds(preselectedIds);
       setSubject("");
       setMessage("");
+      setIsInterview(false);
+      setInterviewDate("");
+      setInterviewTime("");
+      setInterviewMode("online");
+      setInterviewLink("");
     }
   }, [open, preselectedIds]);
 
@@ -82,18 +103,58 @@ export function BulkEmailModal({
       return;
     }
 
+    if (isInterview && (!interviewDate || !interviewTime)) {
+      toast({
+        title: "Incomplete Schedule",
+        description: "Please provide interview date and time.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSending(true);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    const interviewDetails = isInterview ? {
+        date: interviewDate,
+        time: interviewTime,
+        mode: interviewMode,
+        link: interviewLink
+    } : null;
 
-    setSending(false);
-    toast({
-      title: "Emails Sent",
-      description: `Successfully sent ${selectedIds.length} email(s).`,
+    const res = await apiFetch<{
+      results?: { sent?: Array<{ applicationId: string }>; failed?: Array<{ applicationId: string; error: string }> };
+    }>("/emails/bulk", {
+      method: "POST",
+      body: JSON.stringify({
+        subject: subject.trim(),
+        message: message.trim(),
+        applicationIdList: selectedIds,
+        isInterview,
+        interviewDetails
+      }),
     });
 
-    onOpenChange(false);
+    setSending(false);
+
+    if (res.success) {
+      const sentCount = res.results?.sent?.length ?? selectedIds.length;
+      const failedCount = res.results?.failed?.length ?? 0;
+
+      toast({
+        title: isInterview ? "Interviews Scheduled" : "Emails Sent",
+        description: failedCount
+          ? `Processed ${sentCount} application(s). ${failedCount} failed.`
+          : `Successfully processed ${sentCount} application(s).`,
+      });
+
+      onOpenChange(false);
+    } else {
+      toast({
+        title: "Operation Failed",
+        description: res.error || "Unable to complete request.",
+        variant: "destructive",
+      });
+    }
   };
 
   // Convert candidates to selectable format with status
@@ -123,7 +184,7 @@ export function BulkEmailModal({
               selectedIds={selectedIds}
               onSelectionChange={setSelectedIds}
               showStatus={true}
-              maxHeight="220px"
+              maxHeight="200px"
             />
           </div>
 
@@ -147,9 +208,65 @@ export function BulkEmailModal({
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Write your message..."
-              className="min-h-[140px] resize-none"
+              className="min-h-[120px] resize-none"
             />
           </div>
+
+          {/* Interview Toggle */}
+          <div className="flex items-center justify-between p-4 bg-accent/5 rounded-xl border border-accent/10">
+            <div className="space-y-1">
+              <Label className="text-base font-semibold flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-accent" />
+                Schedule Interview?
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Add this to candidates' calendars and mark as interview.
+              </p>
+            </div>
+            <Switch checked={isInterview} onCheckedChange={setIsInterview} />
+          </div>
+
+          {/* Interview Details */}
+          {isInterview && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="space-y-2">
+                <Label>Interview Date</Label>
+                <Input
+                  type="date"
+                  value={interviewDate}
+                  onChange={(e) => setInterviewDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Interview Time</Label>
+                <Input
+                  type="time"
+                  value={interviewTime}
+                  onChange={(e) => setInterviewTime(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Meeting Mode</Label>
+                <Select value={interviewMode} onValueChange={(v: any) => setInterviewMode(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border-border z-[60]">
+                    <SelectItem value="online">Online (Video Call)</SelectItem>
+                    <SelectItem value="offline">In-Person (Office)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>{interviewMode === 'online' ? 'Meeting Link' : 'Location'}</Label>
+                <Input
+                  value={interviewLink}
+                  onChange={(e) => setInterviewLink(e.target.value)}
+                  placeholder={interviewMode === 'online' ? 'https://zoom.us/...' : 'Office address...'}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Send Button */}
@@ -169,8 +286,7 @@ export function BulkEmailModal({
             ) : (
               <>
                 <Send className="h-4 w-4 mr-2" />
-                Send to {selectedIds.length} Recipient
-                {selectedIds.length !== 1 ? "s" : ""}
+                {isInterview ? `Schedule & Notify ${selectedIds.length} Recipient${selectedIds.length !== 1 ? 's' : ''}` : `Send Email to ${selectedIds.length} Recipient${selectedIds.length !== 1 ? 's' : ''}`}
               </>
             )}
           </Button>
@@ -179,3 +295,4 @@ export function BulkEmailModal({
     </Dialog>
   );
 }
+

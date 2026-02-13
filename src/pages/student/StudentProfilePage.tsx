@@ -28,6 +28,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
 import { studentProfileService, StudentProfile } from "@/services/studentProfileService";
 import { useAuth } from "@/contexts/AuthContext";
+import { calculateProfileCompletion } from "@/lib/utils";
 
 const initialProfile = {
   firstName: "",
@@ -113,26 +114,10 @@ export default function StudentProfilePage() {
     fetchProfile();
   }, []);
 
+  const currentProfile = isEditing ? editedProfile : profile;
+
   // Calculate profile completion
-  const calculateCompletion = () => {
-    let score = 0;
-    const total = 10;
-
-    if (profile.firstName && profile.lastName) score++;
-    if (profile.email) score++;
-    if (profile.phone) score++;
-    if (profile.bio && profile.bio.length > 50) score++;
-    if (profile.college && profile.degree) score++;
-    if (profile.skills.length >= 3) score++;
-    if (profile.interests.length >= 2) score++;
-    if (profile.experience.length > 0) score++;
-    if (profile.links.github || profile.links.linkedin) score++;
-    if (profile.resume) score++;
-
-    return Math.round((score / total) * 100);
-  };
-
-  const completionPercentage = calculateCompletion();
+  const completionPercentage = calculateProfileCompletion(currentProfile);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -236,8 +221,6 @@ export default function StudentProfilePage() {
       interests: editedProfile.interests.filter((i) => i !== interest),
     });
   };
-
-  const currentProfile = isEditing ? editedProfile : profile;
 
   if (isLoading) {
     return (
@@ -344,12 +327,23 @@ export default function StudentProfilePage() {
               </CardHeader>
               <CardContent>
                 {currentProfile.resume ? (
-                  <div className="flex items-center gap-3 p-3 bg-secondary rounded-lg">
-                    <FileText className="h-8 w-8 text-accent" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{currentProfile.resume}</p>
-                      <p className="text-xs text-muted-foreground">Uploaded 2 days ago</p>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3 p-3 bg-secondary rounded-lg">
+                      <FileText className="h-8 w-8 text-accent" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{currentProfile.resume.split('/').pop()}</p>
+                        <p className="text-xs text-muted-foreground">Current resume on file</p>
+                      </div>
                     </div>
+                    <Button variant="outline" className="w-full" asChild>
+                      <a 
+                        href={currentProfile.resume.startsWith('http') ? currentProfile.resume : `http://localhost:3000${currentProfile.resume}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                      >
+                        View Resume
+                      </a>
+                    </Button>
                   </div>
                 ) : (
                   <p className="text-muted-foreground text-sm">No resume uploaded</p>

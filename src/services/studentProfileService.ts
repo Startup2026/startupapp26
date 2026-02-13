@@ -21,6 +21,7 @@ export interface StudentProfile {
   skills?: string[];
   interests?: string[];
   experience?: any[];
+  profilepic?: string;
   resumeUrl?: string;
   linkedinUrl?: string;
   githubUrl?: string;

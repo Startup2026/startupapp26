@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { SocketProvider } from "@/contexts/SocketContext";
 import Index from "./pages/Index";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -14,6 +15,7 @@ import ApplicationsPage from "./pages/student/ApplicationsPage";
 import NotificationsPage from "./pages/student/NotificationsPage";
 import StartupDiscoveryPage from "./pages/student/StartupDiscoveryPage";
 import StudentProfilePage from "./pages/student/StudentProfilePage";
+import StudentSettingsPage from "./pages/student/StudentSettingsPage";
 import CreateStudentProfilePage from "./pages/student/CreateStudentProfilePage";
 import StartupFeedPage from "./pages/student/StartupFeedPage";
 import StartupProfilePage from "./pages/student/StartupProfilePage";
@@ -32,6 +34,7 @@ import Shortlisted from "./pages/startup/Shortlisted";
 import Selected from "./pages/startup/Selected";
 import InterviewCalendarPage from "./pages/startup/InterviewCalendarPage";
 import JobAnalysisPage from "./pages/startup/JobAnalysisPage";
+import StartupSettingsPage from "./pages/startup/StartupSettingsPage";
 import TrendingJobsPage from "./pages/student/TrendingJobsPost";
 import SavedItemsPage from "./pages/student/SavePage";
 const queryClient = new QueryClient();
@@ -39,10 +42,11 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
+      <SocketProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<LoginPage />} />
@@ -58,6 +62,7 @@ const App = () => (
             <Route path="/student/applications" element={<ApplicationsPage />} />
             <Route path="/student/notifications" element={<NotificationsPage />} />
             <Route path="/student/profile" element={<StudentProfilePage />} />
+            <Route path="/student/settings" element={<StudentSettingsPage />} />
             <Route path="/student/feed" element={<StartupFeedPage />} />
             <Route path="/student/TrendingJobs" element={<TrendingJobsPage />} />
             <Route path="/student/saved" element={<SavedItemsPage />} />
@@ -71,6 +76,7 @@ const App = () => (
             <Route path="/startup/profile" element={<StartupProfile />} />
             <Route path="/startup/shortlisted" element={<Shortlisted />} />
             <Route path="/startup/selected" element={<Selected />} />
+            <Route path="/startup/settings" element={<StartupSettingsPage />} />
             
             {/* Admin routes */}
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
@@ -81,10 +87,9 @@ const App = () => (
             
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </SocketProvider>
     </AuthProvider>
   </QueryClientProvider>
-);
-
-export default App;
+);export default App;

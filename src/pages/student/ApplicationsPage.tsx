@@ -23,6 +23,8 @@ import {
 } from "lucide-react";
 import { apiFetch, getStoredUser } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSocket } from "@/contexts/SocketContext";
+import { useToast } from "@/hooks/use-toast";
 
 type ApplicationStatus = "applied" | "shortlisted" | "rejected" | "all";
 
@@ -68,6 +70,34 @@ export default function ApplicationsPage() {
   const [statusFilter, setStatusFilter] = useState<ApplicationStatus>("all");
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
+  const { socket } = useSocket();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!socket) return;
+
+    // Listen for application status updates
+    const handleStatusUpdate = (data: { applicationId: string, status: string, jobRole?: string, company?: string }) => {
+        console.log("Status update received:", data);
+        setApplications(prev => prev.map(app => {
+            if (app._id === data.applicationId) {
+                return { ...app, status: data.status };
+            }
+            return app;
+        }));
+
+        toast({
+            title: "Application Updated",
+            description: `Your application for ${data.jobRole || 'a job'} at ${data.company || 'a company'} has been updated to ${data.status}.`,
+        });
+    };
+
+    socket.on("applicationStatusUpdated", handleStatusUpdate);
+
+    return () => {
+        socket.off("applicationStatusUpdated", handleStatusUpdate);
+    };
+  }, [socket, toast]);
 
   useEffect(() => {
     const fetchApplications = async () => {
@@ -244,6 +274,18 @@ export default function ApplicationsPage() {
                           {config.label}
                         </div>
                       </Badge>
+                      {app.resumeUrl && (
+                        <Button variant="link" size="sm" className="h-auto p-0 text-accent" asChild>
+                          <a 
+                            href={app.resumeUrl.startsWith('http') ? app.resumeUrl : `http://localhost:3000${app.resumeUrl}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                          >
+                            <FileText className="h-3 w-3 mr-1" />
+                            View Applied Resume
+                          </a>
+                        </Button>
+                      )}
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Calendar className="h-3 w-3" />
                         <span>Applied on {new Date(app.createdAt).toLocaleDateString()}</span>

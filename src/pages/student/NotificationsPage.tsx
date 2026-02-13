@@ -7,6 +7,8 @@ import { Bell, Check, Clock, AlertTriangle, Info, CheckCircle, XCircle } from "l
 import { apiFetch } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { useSocket } from "@/contexts/SocketContext";
+import { cn } from "@/lib/utils";
 
 interface Notification {
   _id: string;
@@ -21,22 +23,58 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { socket } = useSocket();
 
   useEffect(() => {
     fetchNotifications();
   }, []);
 
+  useEffect(() => {
+    if (!socket) return;
+    
+    console.log("NotificationsPage: Socket active, listening for events...");
+
+    const handleNotification = (notification: Notification) => {
+      console.log("NotificationsPage: Notification received", notification);
+      setNotifications((prev) => {
+        const exists = prev.some((n) => n._id === notification._id);
+        return exists ? prev : [notification, ...prev];
+      });
+
+      // Toast is already handled in Layout, but we can do it here too if not in layout
+      // Or just rely on Layout's toast to avoid duplicates if user is on this page.
+      // But user typically wants to see the list update visibly.
+    };
+
+    socket.on("notification", handleNotification);
+
+    return () => {
+      socket.off("notification", handleNotification);
+    };
+  }, [socket, toast]);
+
   const fetchNotifications = async () => {
     setLoading(true);
     try {
       const response = await apiFetch<Notification[]>("/notifications");
+      console.log("Notification response:", response);
       if (response.success && response.data) {
         setNotifications(response.data);
       } else {
-        console.error("Failed to fetch notifications");
+        console.error("Failed to fetch notifications:", response.error || "Unknown error");
+        toast({
+          title: "Error",
+          description: "Failed to load notifications. Please try again.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error("Error:", error);
+      toast({
+        title: "Error",
+        description: "Network error. Please check your connection.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -49,6 +87,9 @@ export default function NotificationsPage() {
         setNotifications((prev) =>
           prev.map((n) => (n._id === id ? { ...n, read: true } : n))
         );
+        
+        // Emit event to update badge count
+        window.dispatchEvent(new CustomEvent('notificationRead'));
       }
     } catch (error) {
         console.error("Error marking as read", error);
@@ -64,6 +105,9 @@ export default function NotificationsPage() {
                 title: "All cleared",
                 description: "All notifications marked as read",
             });
+            
+            // Emit event to update badge count
+            window.dispatchEvent(new CustomEvent('allNotificationsRead'));
         }
     } catch(error){
         console.error("failed to mark all as read");
@@ -104,7 +148,7 @@ export default function NotificationsPage() {
                 <div className="bg-muted p-4 rounded-full mb-4">
                   <Bell className="h-8 w-8 text-muted-foreground" />
                 </div>
-                <h3 className="text-lg font-medium">No cancellations yet</h3>
+                <h3 className="text-lg font-medium">No notifications yet</h3>
                 <p className="text-muted-foreground mt-1 max-w-sm">
                   We'll notify you when there's an update on your applications or jobs.
                 </p>
@@ -114,7 +158,14 @@ export default function NotificationsPage() {
             notifications.map((notification) => (
               <Card 
                 key={notification._id} 
-                className={`transition-all hover:shadow-md ${!notification.read ? 'bg-accent/5 border-l-4 border-l-accent' : ''}`}
+                className={cn(
+                  "transition-all hover:shadow-md cursor-pointer mb-4",
+                  // Unread: Blue/Accent tint + Left Border
+                  !notification.read 
+                    ? "bg-accent/10 border-l-4 border-l-accent border-y border-r border-border" 
+                    // Read: Solid Card Background + Standard Border
+                    : "bg-card border border-border opacity-100" 
+                )}
                 onClick={() => !notification.read && markAsRead(notification._id)}
               >
                 <CardContent className="p-4 flex gap-4 items-start">
@@ -123,20 +174,36 @@ export default function NotificationsPage() {
                   </div>
                   <div className="flex-1 space-y-1">
                     <div className="flex justify-between items-start">
-                        <h4 className={`font-medium ${!notification.read ? 'text-foreground' : 'text-muted-foreground'}`}>
+                        <h4 className={cn(
+                          "font-semibold text-base",
+                          // Make title always dark/visible, slightly lighter if read
+                          !notification.read ? "text-foreground" : "text-foreground/80"
+                        )}>
                             {notification.title}
                         </h4>
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <span className="text-xs text-muted-foreground flex items-center gap-1 shrink-0">
                             <Clock className="h-3 w-3" />
                             {new Date(notification.createdAt).toLocaleDateString()}
                         </span>
                     </div>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
+                    <p className={cn(
+                      "text-sm leading-relaxed",
+                      // Message text visibility
+                      !notification.read ? "text-foreground" : "text-muted-foreground"
+                    )}>
                       {notification.message}
                     </p>
+                    {notification.read && (
+                      <div className="flex items-center gap-2 mt-2">
+                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground text-xs font-medium">
+                            <Check className="h-3 w-3" />
+                            Read
+                         </span>
+                      </div>
+                    )}
                   </div>
                   {!notification.read && (
-                    <div className="h-2 w-2 rounded-full bg-accent mt-2"></div>
+                    <div className="h-2.5 w-2.5 rounded-full bg-accent mt-2 flex-shrink-0 animate-pulse"></div>
                   )}
                 </CardContent>
               </Card>

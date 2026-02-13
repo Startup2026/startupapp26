@@ -30,6 +30,7 @@ export interface StartupProfile {
   }>;
   hiring?: boolean;
   verified?: boolean;
+  views?: number;
 }
 
 export interface CreateStartupProfileData {

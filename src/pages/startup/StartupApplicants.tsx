@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   MoreVertical,
   Search,
   User,
   Briefcase,
   Calendar,
+  Loader2,
   FileText,
   GraduationCap,
   Clock,
@@ -35,6 +36,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
+import { startupProfileService } from "@/services/startupProfileService";
+import { jobService } from "@/services/jobService";
+import { applicationService } from "@/services/applicationService";
+import { format } from "date-fns";
 
 /* ---------------- Types ---------------- */
 
@@ -43,292 +48,277 @@ type ApplicationStatus =
   | "SHORTLISTED"
   | "REJECTED"
   | "INTERVIEW_SCHEDULED"
-  | "SELECTED";
+  | "HIRED";
 
 interface Application {
   _id: string;
   jobId: string;
-  studentId: string;
-
-  candidateName: string;
-  candidateEmail: string;
-
   jobTitle: string;
-  skills: string[];
-
-  appliedAt: string; // createdAt
+  applicantName: string;
+  email: string;
   status: ApplicationStatus;
-
-  atsScore: number;
+  appliedDate: string;
+  skills: string[];
   experience: number;
-  education: string;
-
-  resumeUrl: string | null;
+  education?: string;
+  resumeUrl?: string;
+  atsScore?: number;
 }
 
-const initialApplications: Application[] = [
-  {
-    _id: "1",
-    jobId: "job123",
-    studentId: "stu123",
-    candidateName: "Amit Sharma",
-    candidateEmail: "amit@gmail.com",
-    jobTitle: "Frontend Developer",
-    skills: ["React", "TypeScript", "Tailwind"],
-    appliedAt: "12 Jan 2026",
-    status: "APPLIED",
-    atsScore: 78,
-    experience: 2,
-    education: "B.E. Computer Engineering",
-    resumeUrl: "/resume/amit.pdf",
-  },
-  {
-    _id: "2",
-    jobId: "job124",
-    studentId: "stu124",
-    candidateName: "Neha Patil",
-    candidateEmail: "neha@gmail.com",
-    jobTitle: "Backend Engineer",
-    skills: ["Node.js", "MongoDB", "Express"],
-    appliedAt: "13 Jan 2026",
-    status: "SHORTLISTED",
-    atsScore: 85,
-    experience: 3,
-    education: "B.Tech IT",
-    resumeUrl: "/resume/neha.pdf",
-  },
-];
-
-/* ---------------- Page ---------------- */
-
 export default function StartupApplicants() {
-  const [applications, setApplications] =
-    useState<Application[]>(initialApplications);
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedApplicant, setSelectedApplicant] = useState<Application | null>(null);
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
-  const [selectedApplicant, setSelectedApplicant] =
-    useState<Application | null>(null);
+  useEffect(() => {
+    const fetchData = async () => {
+        try {
+            setLoading(true);
+            const profileRes = await startupProfileService.getMyProfile();
+            if (!profileRes.success || !profileRes.data) return;
+            const profileId = profileRes.data._id;
 
-  const updateStatus = (_id: string, status: ApplicationStatus) => {
-    setApplications((prev) =>
-      prev.map((a) => (a._id === _id ? { ...a, status } : a)),
-    );
+            const jobsRes = await jobService.getAllJobs();
+            if (!jobsRes.success || !jobsRes.data) return;
 
-    toast({
-      title: "Status Updated",
-      description: `Applicant marked as ${status.replace("_", " ")}`,
-    });
+            const myJobs = jobsRes.data.filter((job: any) => {
+                 const jSid = typeof job.startupId === 'object' ? job.startupId._id : job.startupId;
+                 return jSid === profileId;
+            });
+
+            let allMyApplicants: any[] = [];
+
+            // Fetch applicants for EACH job specifically to ensure proper population
+            await Promise.all(myJobs.map(async (job: any) => {
+                const appRes = await applicationService.getJobApplicants(job._id);
+                if (appRes.success && appRes.data) {
+                    const mappedApps = appRes.data.map((app: any) => ({
+                        ...app,
+                        jobId: job // Ensure jobId is the job object
+                    }));
+                    allMyApplicants = [...allMyApplicants, ...mappedApps];
+                }
+            }));
+
+            const mapped = allMyApplicants.map((app: any) => {
+                const student = app.studentId;
+                const job = app.jobId;
+                
+                return {
+                    _id: app._id,
+                    jobId: job._id,
+                    jobTitle: job?.role || "Unknown",
+                    applicantName: student ? `${student.firstName} ${student.lastName}` : "Unknown Student",
+                    email: student?.email || "",
+                    status: app.status,
+                    appliedDate: app.createdAt ? format(new Date(app.createdAt), "yyyy-MM-dd") : "N/A",
+                    skills: student?.skills || [],
+                    experience: student?.experience?.length || 0,
+                    education: student?.education && student.education.length > 0 ? student.education[0].degree : "N/A",
+                    resumeUrl: student?.resumeUrl || app.resumeUrl || null,
+                    atsScore: app.atsScore || 0
+                };
+            });
+            setApplications(mapped);
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setLoading(false);
+        }
+    };
+    fetchData();
+  }, []);
+
+  const handleStatusChange = async (appId: string, newStatus: ApplicationStatus) => {
+    try {
+        const res = await applicationService.updateApplication(appId, { status: newStatus });
+        if(res.success) {
+            setApplications(prev => prev.map(app => app._id === appId ? { ...app, status: newStatus } : app));
+            toast({ title: "Status Updated", description: `Application status changed to ${newStatus}` });
+        }
+    } catch(e) {
+        toast({ title: "Error", description: "Failed to update status", variant: "destructive" });
+    }
   };
 
-  const filteredApplications = applications.filter((a) => {
-    const matchSearch =
-      a.candidateName.toLowerCase().includes(search.toLowerCase()) ||
-      a.jobTitle.toLowerCase().includes(search.toLowerCase());
-
-    const matchStatus = statusFilter === "ALL" || a.status === statusFilter;
-
-    return matchSearch && matchStatus;
+  const filteredApps = applications.filter((app) => {
+    const matchesSearch =
+      app.applicantName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      app.jobTitle.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === "all" || app.status === statusFilter;
+    return matchesSearch && matchesStatus;
   });
+
+  if (loading) return (
+      <StartupLayout>
+          <div className="flex bg-background h-[calc(100vh-4rem)] items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+      </StartupLayout>
+  );
 
   return (
     <StartupLayout>
-      <div className="p-6 lg:p-8 space-y-6">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <User className="h-7 w-7 text-teal-600" />
-            Applications
-          </h1>
-
-          <div className="flex gap-3 w-full md:w-auto">
-            <div className="relative w-full md:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <div className="p-6 space-y-6">
+        <div className="flex flex-col md:flex-row justify-between gap-4 md:items-center">
+          <div>
+            <h1 className="text-3xl font-bold">All Applicants</h1>
+            <p className="text-muted-foreground">Manage all your job applications</p>
+          </div>
+          <div className="flex gap-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search candidate or job..."
-                className="pl-10"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search applicants..."
+                className="pl-9 w-[250px]"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-44">
-                <SelectValue placeholder="Status" />
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter Status" />
               </SelectTrigger>
-
               <SelectContent>
-                <SelectItem value="ALL">All</SelectItem>
+                <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="APPLIED">Applied</SelectItem>
                 <SelectItem value="SHORTLISTED">Shortlisted</SelectItem>
-                <SelectItem value="INTERVIEW_SCHEDULED">
-                  Interview Scheduled
-                </SelectItem>
-                <SelectItem value="SELECTED">Selected</SelectItem>
+                <SelectItem value="INTERVIEW_SCHEDULED">Interview</SelectItem>
+                <SelectItem value="HIRED">Hired</SelectItem>
                 <SelectItem value="REJECTED">Rejected</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
 
-        {/* Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredApplications.map((app) => (
-            <Card
-              key={app._id}
-              onClick={() => setSelectedApplicant(app)}
-              className="cursor-pointer hover:border-teal-500 transition"
-            >
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">{app.candidateName}</CardTitle>
-
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      asChild
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Button variant="ghost" size="icon">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => updateStatus(app._id, "APPLIED")}
-                      >
-                        Mark Applied
-                      </DropdownMenuItem>
-
-                      <DropdownMenuItem
-                        onClick={() => updateStatus(app._id, "SHORTLISTED")}
-                      >
-                        Shortlist
-                      </DropdownMenuItem>
-
-                      <DropdownMenuItem
-                        onClick={() =>
-                          updateStatus(app._id, "INTERVIEW_SCHEDULED")
-                        }
-                      >
-                        Schedule Interview
-                      </DropdownMenuItem>
-
-                      <DropdownMenuItem
-                        onClick={() => updateStatus(app._id, "SELECTED")}
-                      >
-                        Select Candidate
-                      </DropdownMenuItem>
-
-                      <DropdownMenuItem
-                        onClick={() => updateStatus(app._id, "REJECTED")}
-                      >
-                        Reject
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </CardHeader>
-
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <Briefcase className="h-4 w-4 text-muted-foreground" />
-                  {app.jobTitle}
-                </div>
-
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  Applied on {app.appliedAt}
-                </div>
-
-                <div className="flex flex-wrap gap-1.5">
-                  {app.skills.map((skill) => (
-                    <Badge
-                      key={skill}
-                      variant="outline"
-                      className="text-[10px]"
-                    >
-                      {skill}
-                    </Badge>
-                  ))}
-                </div>
-
-                <Badge
-                  className={
-                    app.status === "SHORTLISTED"
-                      ? "bg-teal-400 text-white"
-                      : app.status === "INTERVIEW_SCHEDULED"
-                        ? "bg-teal-600 text-white"
-                        : app.status === "SELECTED"
-                          ? "bg-teal-800 text-white"
-                          : app.status === "REJECTED"
-                            ? "bg-destructive text-destructive-foreground"
-                            : "bg-secondary text-secondary-foreground"
-                  }
+          {filteredApps.length === 0 ? (
+            <div className="col-span-full text-center text-muted-foreground py-10">No applicants found.</div>
+          ) : (
+             filteredApps.map((app) => (
+                <Card 
+                  key={app._id} 
+                  className="hover:shadow-md transition-shadow cursor-pointer hover:border-primary/50"
+                  onClick={() => setSelectedApplicant(app)}
                 >
-                  {app.status.replace("_", " ")}
-                </Badge>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      {/* Modal */}
-      <Dialog
-        open={!!selectedApplicant}
-        onOpenChange={() => setSelectedApplicant(null)}
-      >
-        <DialogContent className="max-w-2xl">
-          {selectedApplicant && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Applicant Details</DialogTitle>
-              </DialogHeader>
-
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-xl font-semibold">
-                    {selectedApplicant.candidateName}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {selectedApplicant.jobTitle}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="flex gap-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    {selectedApplicant.experience} years experience
-                  </div>
-
-                  <div className="flex gap-2">
-                    <GraduationCap className="h-4 w-4 text-muted-foreground" />
-                    {selectedApplicant.education}
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {selectedApplicant.skills.map((skill) => (
-                    <Badge key={skill} variant="secondary">
-                      {skill}
-                    </Badge>
-                  ))}
-                </div>
-
-                <Button
-                  asChild
-                  className="bg-teal-500 text-white hover:bg-teal-600"
-                >
-                  <a href={selectedApplicant.resumeUrl} target="_blank">
-                    <FileText className="h-4 w-4 mr-2 text-white" />
-                    View Resume
-                  </a>
-                </Button>
-              </div>
-            </>
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                <User className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-lg max-w-[150px] truncate" title={app.applicantName}>{app.applicantName}</h3>
+                                <p className="text-xs text-muted-foreground">{app.jobTitle}</p>
+                            </div>
+                        </div>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <MoreVertical className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleStatusChange(app._id, "SHORTLISTED")}>Shortlist</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleStatusChange(app._id, "INTERVIEW_SCHEDULED")}>Schedule Interview</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleStatusChange(app._id, "HIRED")}>Hire</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleStatusChange(app._id, "REJECTED")} className="text-destructive">Reject</DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3 pt-2">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calendar className="h-4 w-4" />
+                        <span>Applied: {app.appliedDate}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                        {app.skills.slice(0, 3).map((skill, i) => (
+                            <Badge key={i} variant="secondary" className="text-[10px]">{skill}</Badge>
+                        ))}
+                         {app.skills.length > 3 && (
+                            <Badge variant="secondary" className="text-[10px]">+{app.skills.length - 3}</Badge>
+                         )}
+                    </div>
+                    <div className="flex flex-wrap gap-2 items-center w-full">
+                        <Badge variant={
+                              app.status === 'HIRED' ? 'success' : 
+                              app.status === 'REJECTED' ? 'destructive' : 'outline'
+                          } className="w-fit">
+                            {app.status.replace("_", " ")}
+                        </Badge>
+                        {app.atsScore !== undefined && (
+                             <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">
+                                ATS: {app.atsScore}%
+                             </Badge>
+                        )}
+                    </div>
+                  </CardContent>
+                </Card>
+             ))
           )}
-        </DialogContent>
-      </Dialog>
+        </div>
+
+        {/* Detail Modal */}
+        <Dialog open={!!selectedApplicant} onOpenChange={() => setSelectedApplicant(null)}>
+            <DialogContent className="max-w-2xl">
+                {selectedApplicant && (
+                    <>
+                    <DialogHeader>
+                        <DialogTitle>Applicant Details</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <h3 className="text-2xl font-bold">{selectedApplicant.applicantName}</h3>
+                                <p className="text-muted-foreground">{selectedApplicant.jobTitle}</p>
+                                <p className="text-sm text-muted-foreground">{selectedApplicant.email}</p>
+                            </div>
+                            <Badge className="text-lg">{selectedApplicant.status.replace("_", " ")}</Badge>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="flex gap-2 items-center">
+                                <Clock className="h-5 w-5 text-muted-foreground"/>
+                                <span>{selectedApplicant.experience} Years Experience</span>
+                            </div>
+                            <div className="flex gap-2 items-center">
+                                <GraduationCap className="h-5 w-5 text-muted-foreground"/>
+                                <span>{selectedApplicant.education}</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 className="font-semibold mb-2">Skills</h4>
+                            <div className="flex flex-wrap gap-2">
+                                {selectedApplicant.skills.map(s => <Badge key={s} variant="outline">{s}</Badge>)}
+                            </div>
+                        </div>
+
+                        {selectedApplicant.resumeUrl && (
+                             <Button className="w-full sm:w-auto" asChild>
+                                 <a 
+                                    href={selectedApplicant.resumeUrl.startsWith('http') ? selectedApplicant.resumeUrl : `http://localhost:3000${selectedApplicant.resumeUrl}`} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                 >
+                                     <FileText className="mr-2 h-4 w-4"/> View Resume
+                                 </a>
+                             </Button>
+                        )}
+                        
+                        <div className="pt-4 border-t flex gap-2 justify-end">
+                            <Button variant="outline" onClick={() => handleStatusChange(selectedApplicant._id, "REJECTED")}>Reject</Button>
+                            <Button variant="default" onClick={() => handleStatusChange(selectedApplicant._id, "SHORTLISTED")}>Shortlist</Button>
+                        </div>
+                    </div>
+                    </>
+                )}
+            </DialogContent>
+        </Dialog>
+      </div>
     </StartupLayout>
   );
 }

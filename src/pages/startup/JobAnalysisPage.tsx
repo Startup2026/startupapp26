@@ -6,6 +6,7 @@ import {
   Layers,
   Download,
   Filter,
+  Loader2,
 } from "lucide-react";
 import {
   BarChart,
@@ -28,6 +29,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { startupProfileService } from "@/services/startupProfileService";
+import { jobService } from "@/services/jobService";
+import { applicationService } from "@/services/applicationService";
+import { toast } from "@/hooks/use-toast";
+import { format, subDays, isSameDay } from "date-fns";
 
 /* ---------------- TYPES ---------------- */
 
@@ -41,57 +47,6 @@ interface DistributionItem {
   count: number;
 }
 
-/* ---------------- MOCK API DATA ---------------- */
-
-// Simulates /get-job-post-day-wise-trend (summary endpoint)
-const trendData: TrendPoint[] = [
-  { day: "2024-01-15", count: 4 },
-  { day: "2024-01-16", count: 8 },
-  { day: "2024-01-17", count: 6 },
-  { day: "2024-01-18", count: 12 },
-  { day: "2024-01-19", count: 9 },
-  { day: "2024-01-20", count: 15 },
-  { day: "2024-01-21", count: 11 },
-];
-
-// Simulates /get-job-post-education (by degree)
-const educationByDegree: DistributionItem[] = [
-  { key: "B.Tech", count: 24 },
-  { key: "M.Tech", count: 12 },
-  { key: "BCA", count: 15 },
-  { key: "MCA", count: 8 },
-  { key: "BSc CS", count: 6 },
-];
-
-// Simulates /get-job-post-education (by college)
-const educationByCollege: DistributionItem[] = [
-  { key: "IIT Delhi", count: 18 },
-  { key: "NIT Trichy", count: 14 },
-  { key: "BITS Pilani", count: 12 },
-  { key: "VIT", count: 10 },
-  { key: "Other", count: 11 },
-];
-
-// Simulates /get-job-post-education (by graduationYear)
-const educationByYear: DistributionItem[] = [
-  { key: "2024", count: 28 },
-  { key: "2023", count: 22 },
-  { key: "2022", count: 10 },
-  { key: "2021", count: 5 },
-];
-
-// Simulates /get-main-skills
-const skillsData: DistributionItem[] = [
-  { key: "React", count: 22 },
-  { key: "Node.js", count: 18 },
-  { key: "Python", count: 15 },
-  { key: "TypeScript", count: 14 },
-  { key: "MongoDB", count: 12 },
-  { key: "Docker", count: 9 },
-  { key: "AWS", count: 7 },
-  { key: "SQL", count: 6 },
-];
-
 const CHART_COLORS = [
   "hsl(var(--accent))",
   "hsl(var(--primary))",
@@ -101,49 +56,108 @@ const CHART_COLORS = [
   "hsl(var(--muted-foreground))",
 ];
 
-const mockJobs = [
-  { id: "all", title: "All Jobs" },
-  { id: "1", title: "Frontend Developer" },
-  { id: "2", title: "Backend Engineer" },
-  { id: "3", title: "Full Stack Developer" },
-];
-
 /* ---------------- PAGE ---------------- */
 
 export default function JobAnalysisPage() {
-  const [educationBy, setEducationBy] = useState<"degree" | "college" | "graduationYear">("degree");
+  const [educationBy, setEducationBy] = useState<"degree" | "college">("degree");
   const [selectedJob, setSelectedJob] = useState<string>("all");
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Get education data based on selected filter
-  const getEducationData = () => {
-    switch (educationBy) {
-      case "college":
-        return educationByCollege;
-      case "graduationYear":
-        return educationByYear;
-      default:
-        return educationByDegree;
-    }
-  };
-
-  // Format date for display
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  };
-
-  // Calculate totals
-  const totalApplications = trendData.reduce((sum, d) => sum + d.count, 0);
-  const avgPerDay = Math.round(totalApplications / trendData.length);
-  const peakDay = trendData.reduce((max, d) => (d.count > max.count ? d : max), trendData[0]);
+  // Data states
+  const [analyticsData, setAnalyticsData] = useState<any>(null);
+  const [jobsList, setJobsList] = useState<{id: string, title: string}[]>([]);
 
   useEffect(() => {
-    // TODO: Replace with actual API calls
-    // fetch(`/api/startup/graphical-job-analysis/summary`)
-    // fetch(`/api/startup/graphical-job-analysis/educational-distribution?by=${educationBy}&jobId=${selectedJob}`)
-    // fetch(`/api/startup/graphical-job-analysis/skill-distribution?jobId=${selectedJob}`)
-  }, [educationBy, selectedJob]);
+    const fetchJobs = async () => {
+        try {
+            const profileRes = await startupProfileService.getMyProfile();
+            if(!profileRes.success || !profileRes.data) return;
+            const profileId = profileRes.data._id;
+
+            const jobsRes = await jobService.getAllJobs();
+            if (jobsRes.success && jobsRes.data) {
+                const myJobs = jobsRes.data.filter((job: any) => {
+                    const jSid = (job.startupId && typeof job.startupId === 'object') ? job.startupId._id : job.startupId;
+                    return jSid === profileId;
+                });
+                setJobsList(myJobs.map((j: any) => ({ id: j._id, title: j.role })));
+            }
+        } catch(e) { console.error(e); }
+    };
+    fetchJobs();
+  }, []);
+
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+        try {
+            setLoading(true);
+            const res = await applicationService.getHiringAnalytics(selectedJob);
+            if (res.success) {
+                setAnalyticsData(res.data);
+            }
+        } catch (err) {
+            console.error(err);
+            toast({ title: "Error", description: "Failed to load analytics", variant: "destructive" });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    fetchAnalytics();
+  }, [selectedJob]);
+
+  const handleExport = () => {
+    if (!analyticsData) return;
+
+    const csvRows = [
+      ["Hiring Analysis Report"],
+      ["Date", format(new Date(), "yyyy-MM-dd HH:mm:ss")],
+      ["Job ID", selectedJob],
+      [""],
+      ["Metric", "Value"],
+      ["Total Applications", analyticsData.totalApplications],
+      ["Conversion Rate (%)", analyticsData.conversionRate],
+      [""],
+      ["Status Distribution"],
+      ["Status", "Count"],
+      ...(analyticsData.statusDistribution?.map((s: any) => [s.status, s.count]) || []),
+      [""],
+      ["Top Skills"],
+      ["Skill", "Count"],
+      ...(analyticsData.topSkills?.map((s: any) => [s.skill, s.count]) || []),
+      [""],
+      ["Education background"],
+      ["Background", "Count"],
+      ...(analyticsData.educationDistribution?.map((e: any) => [e.degree, e.count]) || []),
+      [""],
+      ["Experience Level"],
+      ["Range", "Count"],
+      ...(analyticsData.experienceDistribution?.map((ex: any) => [ex.range, ex.count]) || []),
+    ];
+
+    const csvString = csvRows.map(row => row.join(",")).join("\n");
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Hiring_Report_${selectedJob}_${format(new Date(), "yyyy-MM-dd")}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({ title: "Report Exported", description: "Your analysis report has been downloaded." });
+  };
+
+
+  if (loading && !analyticsData) {
+      return (
+          <StartupLayout>
+              <div className="flex bg-background h-[calc(100vh-4rem)] items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+          </StartupLayout>
+      )
+  }
 
   return (
     <StartupLayout>
@@ -168,7 +182,8 @@ export default function JobAnalysisPage() {
                 <SelectValue placeholder="Select Job" />
               </SelectTrigger>
               <SelectContent>
-                {mockJobs.map((job) => (
+                <SelectItem value="all">All Jobs</SelectItem>
+                {jobsList.map((job) => (
                   <SelectItem key={job.id} value={job.id}>
                     {job.title}
                   </SelectItem>
@@ -176,7 +191,7 @@ export default function JobAnalysisPage() {
               </SelectContent>
             </Select>
 
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={handleExport} disabled={!analyticsData}>
               <Download className="h-4 w-4 mr-2" />
               Export Report
             </Button>
@@ -184,13 +199,13 @@ export default function JobAnalysisPage() {
         </div>
 
         {/* SUMMARY STATS */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
           <Card variant="glass">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Applications (7d)</p>
-                  <p className="text-3xl font-bold">{totalApplications}</p>
+                  <p className="text-sm text-muted-foreground">Total Applications</p>
+                  <p className="text-3xl font-bold">{analyticsData?.totalApplications || 0}</p>
                 </div>
                 <div className="h-12 w-12 rounded-full bg-accent/10 flex items-center justify-center">
                   <TrendingUp className="h-6 w-6 text-accent" />
@@ -203,11 +218,11 @@ export default function JobAnalysisPage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Average Per Day</p>
-                  <p className="text-3xl font-bold">{avgPerDay}</p>
+                  <p className="text-sm text-muted-foreground">Conversion Rate</p>
+                  <p className="text-3xl font-bold">{analyticsData?.conversionRate || 0}%</p>
                 </div>
                 <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                  <BarChart3 className="h-6 w-6 text-primary" />
+                  <Layers className="h-6 w-6 text-primary" />
                 </div>
               </div>
             </CardContent>
@@ -217,12 +232,29 @@ export default function JobAnalysisPage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Peak Day</p>
-                  <p className="text-3xl font-bold">{peakDay.count}</p>
-                  <p className="text-xs text-muted-foreground">{formatDate(peakDay.day)}</p>
+                  <p className="text-sm text-muted-foreground">Shortlisted</p>
+                  <p className="text-3xl font-bold">
+                    {analyticsData?.statusDistribution?.find((s:any) => s.status === 'SHORTLISTED')?.count || 0}
+                  </p>
                 </div>
                 <div className="h-12 w-12 rounded-full bg-accent/10 flex items-center justify-center">
-                  <TrendingUp className="h-6 w-6 text-accent" />
+                  <BarChart3 className="h-6 w-6 text-accent" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card variant="glass">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Peak Daily</p>
+                  <p className="text-3xl font-bold">
+                    {analyticsData?.applicationsOverTime?.reduce((max: number, curr: any) => Math.max(max, curr.count), 0) || 0}
+                  </p>
+                </div>
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <TrendingUp className="h-6 w-6 text-primary" />
                 </div>
               </div>
             </CardContent>
@@ -234,7 +266,7 @@ export default function JobAnalysisPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-accent" />
-              Application Trend – Last 7 Days
+              Application Trend – Last 30 Days
             </CardTitle>
             <CardDescription>Day-wise application submissions</CardDescription>
           </CardHeader>
@@ -242,12 +274,13 @@ export default function JobAnalysisPage() {
           <CardContent>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={trendData.map(d => ({ ...d, day: formatDate(d.day) }))}>
+                <LineChart data={analyticsData?.applicationsOverTime || []}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis 
-                    dataKey="day" 
+                    dataKey="date" 
                     stroke="hsl(var(--muted-foreground))"
                     fontSize={12}
+                    tickFormatter={(val) => format(new Date(val), "MMM d")}
                   />
                   <YAxis 
                     stroke="hsl(var(--muted-foreground))"
@@ -260,6 +293,7 @@ export default function JobAnalysisPage() {
                       borderRadius: "8px",
                     }}
                     labelStyle={{ color: "hsl(var(--foreground))" }}
+                    labelFormatter={(val) => format(new Date(val), "MMM d, yyyy")}
                   />
                   <Line
                     type="monotone"
@@ -288,82 +322,36 @@ export default function JobAnalysisPage() {
                 </CardTitle>
                 <CardDescription>Applicants by education background</CardDescription>
               </div>
-
-              <Select value={educationBy} onValueChange={(v) => setEducationBy(v as typeof educationBy)}>
-                <SelectTrigger className="w-36">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="degree">By Degree</SelectItem>
-                  <SelectItem value="college">By College</SelectItem>
-                  <SelectItem value="graduationYear">By Year</SelectItem>
-                </SelectContent>
-              </Select>
             </CardHeader>
-
-            <CardContent>
-              <Tabs defaultValue="bar" className="w-full">
-                <TabsList className="mb-4">
-                  <TabsTrigger value="bar">Bar Chart</TabsTrigger>
-                  <TabsTrigger value="pie">Pie Chart</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="bar">
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={getEducationData()} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                        <YAxis 
-                          dataKey="key" 
-                          type="category" 
-                          stroke="hsl(var(--muted-foreground))" 
-                          fontSize={12}
-                          width={80}
-                        />
-                        <Tooltip 
-                          contentStyle={{
-                            backgroundColor: "hsl(var(--card))",
-                            border: "1px solid hsl(var(--border))",
-                            borderRadius: "8px",
-                          }}
-                        />
-                        <Bar dataKey="count" fill="hsl(var(--accent))" radius={[0, 4, 4, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="pie">
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={getEducationData()}
-                          dataKey="count"
-                          nameKey="key"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          label={({ key, percent }) => `${key}: ${(percent * 100).toFixed(0)}%`}
-                          labelLine={false}
-                        >
-                          {getEducationData().map((_, index) => (
-                            <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip 
-                          contentStyle={{
-                            backgroundColor: "hsl(var(--card))",
-                            border: "1px solid hsl(var(--border))",
-                            borderRadius: "8px",
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                </TabsContent>
-              </Tabs>
+             <CardContent>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart 
+                        data={analyticsData?.educationDistribution || []} 
+                        layout="vertical" 
+                        margin={{ left: 20 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                      <XAxis type="number" hide />
+                      <YAxis 
+                         dataKey="degree" 
+                         type="category" 
+                         width={120} 
+                         tick={{ fontSize: 12 }} 
+                         interval={0}
+                      />
+                      <Tooltip 
+                        cursor={{ fill: 'transparent' }}
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                      />
+                      <Bar dataKey="count" fill="hsl(var(--accent))" radius={[0, 4, 4, 0]} barSize={20} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
             </CardContent>
           </Card>
 
@@ -371,60 +359,93 @@ export default function JobAnalysisPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Layers className="h-5 w-5 text-accent" />
-                Top Skills Distribution
+                <BarChart3 className="h-5 w-5 text-accent" />
+                Top Applicant Skills
               </CardTitle>
-              <CardDescription>Most common skills among applicants</CardDescription>
+              <CardDescription>Most common skills among candidates</CardDescription>
             </CardHeader>
-
             <CardContent>
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={skillsData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis 
-                      dataKey="key" 
-                      stroke="hsl(var(--muted-foreground))" 
-                      fontSize={12}
-                      angle={-45}
-                      textAnchor="end"
-                      height={60}
-                    />
-                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <Tooltip 
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                    />
-                    <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                      {skillsData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+               <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={analyticsData?.topSkills || []}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis 
+                        dataKey="skill" 
+                        tick={{ fontSize: 10 }}
+                        interval={0}
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                      />
+                      <YAxis hide />
+                      <Tooltip 
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                      />
+                      <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+               </div>
+            </CardContent>
+          </Card>
 
-              {/* Skills Legend */}
-              <div className="mt-4 flex flex-wrap gap-2">
-                {skillsData.slice(0, 5).map((skill) => (
-                  <Badge key={skill.key} variant="outline" className="text-xs">
-                    {skill.key}: {skill.count}
-                  </Badge>
-                ))}
-              </div>
+          {/* STATUS BREAKDOWN */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Application Status</CardTitle>
+              <CardDescription>Funnel distribution</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={analyticsData?.statusDistribution || []}
+                        dataKey="count"
+                        nameKey="status"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={5}
+                      >
+                        {analyticsData?.statusDistribution?.map((_: any, index: number) => (
+                           <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+            </CardContent>
+          </Card>
+
+          {/* EXPERIENCE DISTRIBUTION */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Experience Levels</CardTitle>
+              <CardDescription>Candidate seniority breakdown</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={analyticsData?.experienceDistribution || []}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="range" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
             </CardContent>
           </Card>
         </div>
-
-        {/* UX NOTE */}
-        <p className="text-xs text-muted-foreground text-center">
-          Showing analytics for {selectedJob === "all" ? "all jobs" : mockJobs.find(j => j.id === selectedJob)?.title}. 
-          Use filters or export for detailed reports.
-        </p>
       </div>
     </StartupLayout>
   );
 }
+

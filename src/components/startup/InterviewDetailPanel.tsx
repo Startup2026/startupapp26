@@ -1,8 +1,10 @@
-import { format, parseISO } from "date-fns";
-import { X, Video, MapPin, Mail, Calendar, Clock, User, Briefcase, FileText, ExternalLink } from "lucide-react";
+import { useState, useEffect } from "react";
+import { format, parseISO, parse } from "date-fns";
+import { X, Video, MapPin, Mail, Calendar, Clock, User, Briefcase, FileText, ExternalLink, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
 import {
   Sheet,
   SheetContent,
@@ -18,12 +20,15 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { Interview } from "./InterviewCalendar";
+import { interviewService } from "@/services/interviewService";
+import { toast } from "@/hooks/use-toast";
 
 interface InterviewDetailPanelProps {
   interview: Interview | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onStatusChange?: (interviewId: string, status: Interview["status"]) => void;
+  onReschedule?: (interview: Interview) => void;
 }
 
 const stageLabels: Record<string, string> = {
@@ -52,8 +57,55 @@ export function InterviewDetailPanel({
   open,
   onOpenChange,
   onStatusChange,
+  onReschedule,
 }: InterviewDetailPanelProps) {
+  const [isRescheduling, setIsRescheduling] = useState(false);
+  const [rescheduleData, setRescheduleData] = useState({
+    date: "",
+    time: "",
+  });
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (interview) {
+      setRescheduleData({
+        date: interview.date,
+        time: interview.time,
+      });
+      setIsRescheduling(false);
+    }
+  }, [interview]);
+
   if (!interview) return null;
+
+  const handleReschedule = async () => {
+    try {
+      setLoading(true);
+      const res = await interviewService.rescheduleInterview(interview.id, {
+        interviewDate: rescheduleData.date,
+        interviewTime: rescheduleData.time,
+      });
+
+      if (res.success) {
+        toast({ title: "Success", description: "Interview rescheduled successfully" });
+        setIsRescheduling(false);
+        if (onReschedule) {
+          onReschedule({
+            ...interview,
+            date: rescheduleData.date,
+            time: rescheduleData.time,
+          });
+        }
+      } else {
+        toast({ title: "Error", description: res.error || "Failed to reschedule", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Something went wrong", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -82,11 +134,25 @@ export function InterviewDetailPanel({
                 <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center">
                   <Calendar className="h-5 w-5 text-accent" />
                 </div>
-                <div>
-                  <p className="font-medium">
-                    {format(parseISO(interview.date), "EEEE, MMMM d, yyyy")}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Date</p>
+                <div className="flex-1">
+                  {isRescheduling ? (
+                    <div className="space-y-1">
+                      <Input
+                        type="date"
+                        value={rescheduleData.date}
+                        onChange={(e) => setRescheduleData({ ...rescheduleData, date: e.target.value })}
+                        className="h-8 py-1"
+                      />
+                      <p className="text-xs text-muted-foreground">Select New Date</p>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="font-medium">
+                        {format(parse(interview.date, "yyyy-MM-dd", new Date()), "EEEE, MMMM d, yyyy")}
+                      </p>
+                      <p className="text-sm text-muted-foreground">Date</p>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -94,9 +160,23 @@ export function InterviewDetailPanel({
                 <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center">
                   <Clock className="h-5 w-5 text-accent" />
                 </div>
-                <div>
-                  <p className="font-medium">{interview.time}</p>
-                  <p className="text-sm text-muted-foreground">Time</p>
+                <div className="flex-1">
+                   {isRescheduling ? (
+                    <div className="space-y-1">
+                      <Input
+                        type="time"
+                        value={rescheduleData.time}
+                        onChange={(e) => setRescheduleData({ ...rescheduleData, time: e.target.value })}
+                        className="h-8 py-1"
+                      />
+                      <p className="text-xs text-muted-foreground">Select New Time</p>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="font-medium">{interview.time}</p>
+                      <p className="text-sm text-muted-foreground">Time</p>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -178,37 +258,57 @@ export function InterviewDetailPanel({
           )}
 
           {/* Update Status */}
-          <div className="space-y-4">
-            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-              Update Status
-            </h3>
-            
-            <Select
-              value={interview.status}
-              onValueChange={(value) => onStatusChange?.(interview.id, value as Interview["status"])}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="scheduled">Scheduled</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="no-show">No Show</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-3 pt-4">
-            <Button variant="outline" className="flex-1 gap-2">
-              <Mail className="h-4 w-4" />
-              Send Reminder
-            </Button>
-            <Button variant="outline" className="flex-1 gap-2">
-              <Calendar className="h-4 w-4" />
-              Reschedule
-            </Button>
+          <div className="grid grid-cols-2 gap-3 pt-4">
+            {isRescheduling ? (
+               <>
+                <Button 
+                  variant="outline" 
+                   className="gap-2"
+                   onClick={() => setIsRescheduling(false)}
+                   disabled={loading}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                   className="gap-2"
+                   onClick={handleReschedule}
+                   disabled={loading}
+                >
+                  {loading ? "Saving..." : "Save Changes"}
+                  {!loading && <Save className="h-4 w-4" />}
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="col-span-1">
+                   <p className="text-xs text-muted-foreground mb-2 px-1">Update Status</p>
+                    <Select
+                      value={interview.status}
+                      onValueChange={(value) => onStatusChange?.(interview.id, value as Interview["status"])}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="scheduled">Scheduled</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="no-show">No Show</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                </div>
+                <div className="col-span-1 flex items-end">
+                    <Button 
+                      variant="outline" 
+                      className="w-full gap-2"
+                      onClick={() => setIsRescheduling(true)}
+                    >
+                      <Calendar className="h-4 w-4" />
+                      Reschedule
+                    </Button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </SheetContent>
