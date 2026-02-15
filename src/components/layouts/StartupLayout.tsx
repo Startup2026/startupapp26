@@ -38,6 +38,7 @@ import { apiFetch } from "@/lib/api";
 import { useSocket } from "@/contexts/SocketContext";
 import { formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePlanAccess } from "@/hooks/usePlanAccess";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/startup/dashboard" },
@@ -47,19 +48,20 @@ const navItems = [
   { icon: UserCheck, label: "Shortlisted", href: "/startup/shortlisted" },
   { icon: UserPlus, label: "Selected", href: "/startup/selected" },
   { icon: BarChart3, label: "Analysis", href: "/startup/analysis" },
+  { icon: TrendingUp, label: "Advanced Analytics", href: "/startup/advanced-analysis" },
   { icon: TrendingUp, label: "Social Analysis", href: "/startup/social-media-analysis" },
   { icon: Calendar, label: "Interviews", href: "/startup/interviews" },
+  { icon: Bell, label: "Notifications", href: "/startup/notifications" },
   // ---
   // { icon: MessageSquare, label: "Updates", href: "/startup/updates" },
   { icon: User, label: "Profile", href: "/startup/profile" },
   { icon: Settings, label: "Settings", href: "/startup/settings" },
 ];
 
-// ... rest of your component logic remains the same
-
 export function StartupLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const { user, logout } = useAuth();
+  const { loading: planLoading } = usePlanAccess();
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -77,6 +79,7 @@ export function StartupLayout({ children }: { children: ReactNode }) {
 
   // Fetch unread count and recent notifications
   useEffect(() => {
+    if (planLoading) return;
     const fetchData = async () => {
       // Fetch unread count
       const countRes = await apiFetch<{ count: number }>("/notifications/unread-count");
@@ -104,11 +107,11 @@ export function StartupLayout({ children }: { children: ReactNode }) {
       window.removeEventListener('notificationRead', handleRefresh);
       window.removeEventListener('allNotificationsRead', handleRefresh);
     };
-  }, []);
+  }, [planLoading]);
 
   // Listen for new notifications via socket
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || planLoading) return;
 
     const handleNewNotification = (notification: any) => {
       console.log("StartupLayout: Socket received notification", notification);
@@ -123,7 +126,15 @@ export function StartupLayout({ children }: { children: ReactNode }) {
       socket.off("notification", handleNewNotification);
       socket.off("new_notification", handleNewNotification);
     };
-  }, [socket]);
+  }, [socket, planLoading]);
+
+  if (planLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   const markAsRead = async (id: string) => {
     try {
@@ -172,10 +183,9 @@ export function StartupLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen flex w-full bg-background overflow-hidden">
-      <aside className="hidden lg:flex lg:w-64 flex-col bg-sidebar border-r border-sidebar-border sticky top-0 h-screen shrink-0">
-        <div className="p-6 flex items-center gap-3">
-          <Logo size="sm" />
-          <span className="text-xl font-bold tracking-tight text-sidebar-foreground">Wostup</span>
+      <aside className="hidden lg:flex lg:w-64 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border sticky top-0 h-screen shrink-0">
+        <div className="p-6">
+          <Logo size="sm" variant="light" />
         </div>
         <div className="flex-1 px-4 overflow-y-auto">
           <NavLinks />
@@ -201,10 +211,9 @@ export function StartupLayout({ children }: { children: ReactNode }) {
                   <Menu className="h-6 w-6" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[280px] p-0 bg-sidebar border-r-0">
-                <div className="p-6 border-b border-sidebar-border flex items-center gap-3">
-                  <Logo size="sm" />
-                  <span className="text-xl font-bold text-sidebar-foreground">Wostup</span>
+              <SheetContent side="left" className="w-[280px] p-0 bg-sidebar text-sidebar-foreground border-r-0">
+                <div className="p-6 border-b border-sidebar-border">
+                  <Logo size="sm" variant="light" />
                 </div>
                 <div className="px-4 py-6">
                   <NavLinks isMobile />
@@ -222,9 +231,8 @@ export function StartupLayout({ children }: { children: ReactNode }) {
               </SheetContent>
             </Sheet>
             
-            <div className="lg:hidden flex items-center gap-2">
+            <div className="lg:hidden">
               <Logo size="xs" />
-              <span className="text-lg font-bold">Wostup</span>
             </div>
           </div>
           

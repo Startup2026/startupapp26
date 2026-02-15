@@ -29,7 +29,16 @@ export default function LoginPage() {
         description: "You have been logged in successfully.",
       });
 
-      // Get user from localStorage to determine role
+      // Handle onboarding redirection
+      if (result.onboardingStep === 'profile') {
+        navigate('/startup/create-profile');
+        return;
+      } else if (result.onboardingStep === 'plan') {
+        navigate('/startup/select-plan');
+        return;
+      }
+
+      // Default role-based redirection
       const storedUser = localStorage.getItem('user');
       if (storedUser) {
         const user = JSON.parse(storedUser);

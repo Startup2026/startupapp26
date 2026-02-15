@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
-import { StudentLayout } from "@/components/layouts/StudentLayout";
+import { StartupLayout } from "@/components/layouts/StartupLayout";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Bell, Check, Clock, AlertTriangle, Info, CheckCircle, XCircle, Briefcase } from "lucide-react";
+import { Bell, Check, Clock, AlertTriangle, Info, CheckCircle, XCircle, Briefcase, UserCheck } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +18,7 @@ interface Notification {
   createdAt: string;
 }
 
-export default function NotificationsPage() {
+export default function StartupNotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -32,24 +31,22 @@ export default function NotificationsPage() {
   useEffect(() => {
     if (!socket) return;
     
-    console.log("NotificationsPage: Socket active, listening for events...");
+    console.log("StartupNotificationsPage: Socket active, listening for events...");
 
     const handleNotification = (notification: Notification) => {
-      console.log("NotificationsPage: Notification received", notification);
+      console.log("StartupNotificationsPage: Notification received", notification);
       setNotifications((prev) => {
         const exists = prev.some((n) => n._id === notification._id);
         return exists ? prev : [notification, ...prev];
       });
-
-      // Toast is already handled in Layout, but we can do it here too if not in layout
-      // Or just rely on Layout's toast to avoid duplicates if user is on this page.
-      // But user typically wants to see the list update visibly.
     };
 
     socket.on("notification", handleNotification);
+    socket.on("new_notification", handleNotification);
 
     return () => {
       socket.off("notification", handleNotification);
+      socket.off("new_notification", handleNotification);
     };
   }, [socket, toast]);
 
@@ -57,14 +54,12 @@ export default function NotificationsPage() {
     setLoading(true);
     try {
       const response = await apiFetch<Notification[]>("/notifications");
-      console.log("Notification response:", response);
       if (response.success && response.data) {
         setNotifications(response.data);
       } else {
-        console.error("Failed to fetch notifications:", response.error || "Unknown error");
         toast({
           title: "Error",
-          description: "Failed to load notifications. Please try again.",
+          description: "Failed to load notifications.",
           variant: "destructive",
         });
       }
@@ -72,7 +67,7 @@ export default function NotificationsPage() {
       console.error("Error:", error);
       toast({
         title: "Error",
-        description: "Network error. Please check your connection.",
+        description: "Network error.",
         variant: "destructive",
       });
     } finally {
@@ -87,8 +82,6 @@ export default function NotificationsPage() {
         setNotifications((prev) =>
           prev.map((n) => (n._id === id ? { ...n, read: true } : n))
         );
-        
-        // Emit event to update badge count
         window.dispatchEvent(new CustomEvent('notificationRead'));
       }
     } catch (error) {
@@ -105,8 +98,6 @@ export default function NotificationsPage() {
                 title: "All cleared",
                 description: "All notifications marked as read",
             });
-            
-            // Emit event to update badge count
             window.dispatchEvent(new CustomEvent('allNotificationsRead'));
         }
     } catch(error){
@@ -120,24 +111,24 @@ export default function NotificationsPage() {
       case "warning": return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
       case "error": return <XCircle className="h-5 w-5 text-red-500" />;
       case "application_update": return <Briefcase className="h-5 w-5 text-blue-500" />;
-      case "interview": return <Clock className="h-5 w-5 text-accent" />;
-      default: return <Info className="h-5 w-5 text-blue-500" />;
+      case "interview": return <UserCheck className="h-5 w-5 text-accent" />;
+      default: return <Bell className="h-5 w-5 text-blue-500" />;
     }
   };
 
   return (
-    <StudentLayout>
+    <StartupLayout>
       <div className="container mx-auto p-6 max-w-4xl space-y-6">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
-            <h1 className="text-2xl font-bold tracking-tight">Notifications</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Startup Notifications</h1>
             <p className="text-muted-foreground">
-              Stay updated with your job applications and profile activity.
+              Manage alerts for applicants, interviews, and your job updates.
             </p>
           </div>
           <Button variant="outline" size="sm" onClick={markAllAsRead} disabled={notifications.every(n => n.read)}>
             <Check className="h-4 w-4 mr-2" />
-            Mark all as read
+            Clear All
           </Button>
         </div>
 
@@ -150,9 +141,9 @@ export default function NotificationsPage() {
                 <div className="bg-muted p-4 rounded-full mb-4">
                   <Bell className="h-8 w-8 text-muted-foreground" />
                 </div>
-                <h3 className="text-lg font-medium">No notifications yet</h3>
+                <h3 className="text-lg font-medium">No alerts today</h3>
                 <p className="text-muted-foreground mt-1 max-w-sm">
-                  We'll notify you when there's an update on your applications or jobs.
+                  We'll ping you here when candidates apply or respond to your interview requests.
                 </p>
               </CardContent>
             </Card>
@@ -161,12 +152,10 @@ export default function NotificationsPage() {
               <Card 
                 key={notification._id} 
                 className={cn(
-                  "transition-all hover:shadow-md cursor-pointer mb-4",
-                  // Unread: Blue/Accent tint + Left Border
+                  "transition-all hover:shadow-md cursor-pointer",
                   !notification.read 
-                    ? "bg-accent/10 border-l-4 border-l-accent border-y border-r border-border" 
-                    // Read: Solid Card Background + Standard Border
-                    : "bg-card border border-border opacity-100" 
+                    ? "bg-accent/[0.03] border-l-4 border-l-accent" 
+                    : "bg-card" 
                 )}
                 onClick={() => !notification.read && markAsRead(notification._id)}
               >
@@ -177,35 +166,25 @@ export default function NotificationsPage() {
                   <div className="flex-1 space-y-1">
                     <div className="flex justify-between items-start">
                         <h4 className={cn(
-                          "font-semibold text-base",
-                          // Make title always dark/visible, slightly lighter if read
-                          !notification.read ? "text-foreground" : "text-foreground/80"
+                          "font-bold text-base",
+                          !notification.read ? "text-foreground" : "text-foreground/70"
                         )}>
                             {notification.title}
                         </h4>
-                        <span className="text-xs text-muted-foreground flex items-center gap-1 shrink-0">
+                        <span className="text-[10px] uppercase font-black tracking-widest text-muted-foreground flex items-center gap-1 shrink-0">
                             <Clock className="h-3 w-3" />
                             {new Date(notification.createdAt).toLocaleDateString()}
                         </span>
                     </div>
                     <p className={cn(
                       "text-sm leading-relaxed",
-                      // Message text visibility
-                      !notification.read ? "text-foreground" : "text-muted-foreground"
+                      !notification.read ? "text-foreground/90" : "text-muted-foreground"
                     )}>
                       {notification.message}
                     </p>
-                    {notification.read && (
-                      <div className="flex items-center gap-2 mt-2">
-                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground text-xs font-medium">
-                            <Check className="h-3 w-3" />
-                            Read
-                         </span>
-                      </div>
-                    )}
                   </div>
                   {!notification.read && (
-                    <div className="h-2.5 w-2.5 rounded-full bg-accent mt-2 flex-shrink-0 animate-pulse"></div>
+                    <div className="h-2 w-2 rounded-full bg-accent mt-2 flex-shrink-0"></div>
                   )}
                 </CardContent>
               </Card>
@@ -213,6 +192,6 @@ export default function NotificationsPage() {
           )}
         </div>
       </div>
-    </StudentLayout>
+    </StartupLayout>
   );
 }

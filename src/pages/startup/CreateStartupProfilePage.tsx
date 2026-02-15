@@ -138,9 +138,9 @@ export default function CreateStartupProfilePage() {
       if (result.success) {
         toast({
           title: "Profile Created!",
-          description: "Welcome to Wostup. Your startup profile is now live.",
+          description: "Welcome to Wostup. Now, please select a plan to continue.",
         });
-        navigate("/startup/dashboard");
+        navigate("/startup/select-plan");
       } else {
         toast({
           title: "Error",

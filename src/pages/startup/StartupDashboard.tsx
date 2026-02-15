@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AnalyticsDashboard } from "@/components/startup/AnalyticsDashboard";
+import { AdvancedJobAnalytics } from "@/components/startup/AdvancedJobAnalytics";
 import {
   Briefcase,
   Users,
@@ -13,7 +14,8 @@ import {
   Clock,
   UserCheck,
   Loader2,
-  FileText
+  FileText,
+  BarChart3
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { StartupLayout } from "@/components/layouts/StartupLayout";
@@ -22,16 +24,29 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EditStartupProfileModal } from "@/components/startup/EditStartupProfileModal";
+import { CreatePostModal } from "@/components/startup/CreatePostModal";
 import { startupProfileService, StartupProfile } from "@/services/startupProfileService";
 import { jobService, Job } from "@/services/jobService";
 import { applicationService, Application } from "@/services/applicationService";
 import { interviewService } from "@/services/interviewService";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { usePlanAccess } from "@/hooks/usePlanAccess";
+import { UpgradeModal } from "@/components/UpgradeModal";
 import { formatDistanceToNow } from "date-fns";
 
 export default function StartupDashboard() {
+  const { 
+    hasAccess, 
+    getFeatureValue, 
+    isUpgradeModalOpen, 
+    closeUpgradeModal, 
+    triggeredFeature, 
+    loading: planLoading,
+    checkAccessAndShowModal 
+  } = usePlanAccess();
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [postModalOpen, setPostModalOpen] = useState(false);
   const [profile, setProfile] = useState<StartupProfile | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
@@ -42,6 +57,8 @@ export default function StartupDashboard() {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (planLoading) return; // Wait for plan to load
+      
       try {
         setLoading(true);
         // 1. Fetch Profile
@@ -75,18 +92,24 @@ export default function StartupDashboard() {
           if (appsResult.success && appsResult.data) {
              // Filter applications for my jobs
              const myApps = appsResult.data.filter(app => {
-                 // Check if the application belongs to one of my jobs
-                 // Note: app.jobId might be populated, so we check app.jobId._id or app.jobId
                  const appJobId = typeof app.jobId === 'object' ? app.jobId._id : app.jobId;
                  return myJobs.some(job => job._id === appJobId);
              });
              setApplications(myApps);
           }
 
-          // 4. Fetch Interviews
-          const invResult = await interviewService.getAllInterviews();
-          if (invResult.success && invResult.data) {
-             setInterviews(invResult.data);
+          // 4. Fetch Interviews (Gated)
+          if (hasAccess("interviewCalendar")) {
+            try {
+              const invResult = await interviewService.getAllInterviews();
+              if (invResult.success && invResult.data) {
+                 setInterviews(invResult.data as any[]);
+              }
+            } catch (invErr) {
+              console.warn("Could not fetch interviews:", invErr);
+            }
+          } else {
+            setInterviews([]); // Default to empty if no access
           }
         }
 
@@ -98,7 +121,7 @@ export default function StartupDashboard() {
     };
 
     fetchData();
-  }, [profileModalOpen]); 
+  }, [profileModalOpen, planLoading, hasAccess]); 
 
   const getInitials = (name?: string | null) => {
     if (!name || typeof name !== "string") {
@@ -160,7 +183,7 @@ export default function StartupDashboard() {
   // Pipeline stats
   const shortlistedCount = applications.filter(a => a.status === 'SHORTLISTED').length;
   const rejectedCount = applications.filter(a => a.status === 'REJECTED').length;
-  const hiredCount = applications.filter(a => a.status === 'HIRED' || a.status === 'SELECTED').length;
+  const hiredCount = applications.filter(a => a.status === 'HIRED').length;
   // Assuming 'APPLIED' is the default new status
   const appliedCount = applications.length; 
 
@@ -202,6 +225,14 @@ export default function StartupDashboard() {
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
+              onClick={() => setPostModalOpen(true)}
+              className="gap-2"
+            >
+              <FileText className="h-4 w-4" />
+              Post Update
+            </Button>
+            <Button
+              variant="outline"
               onClick={() => setProfileModalOpen(true)}
               className="gap-2"
             >
@@ -213,9 +244,10 @@ export default function StartupDashboard() {
 
         {/* Stats Grid */}
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList>
+          <TabsList className="bg-background/50 border border-border p-1">
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="analytics">Advanced Analytics</TabsTrigger>
+            <TabsTrigger value="analytics">Hiring Summary</TabsTrigger>
+            <TabsTrigger value="advanced">Advanced Job Analytics</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-8">
@@ -273,13 +305,13 @@ export default function StartupDashboard() {
                         <Avatar className="h-12 w-12">
                         {/* Use student profile pic if available, else fallback */}
                         <AvatarFallback className="bg-accent/10 text-accent font-semibold">
-                            {app.studentId ? getInitials(app.studentId.firstName || app.studentId.firstname) : "NA"}
+                            {app.studentId ? getInitials(app.studentId.firstname) : "NA"}
                         </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
                         <p className="font-semibold">
                           {app.studentId 
-                            ? `${app.studentId.firstName || app.studentId.firstname || ''} ${app.studentId.lastName || app.studentId.lastname || ''}`.trim() || 'Student'
+                            ? `${app.studentId.firstname || ''} ${app.studentId.lastname || ''}`.trim() || 'Student'
                             : "Unknown Student"}
                         </p>
                         <p className="text-sm text-muted-foreground">
@@ -466,15 +498,58 @@ export default function StartupDashboard() {
           </TabsContent>
 
           <TabsContent value="analytics">
-            <AnalyticsDashboard />
+            {hasAccess("analytics") ? (
+              <AnalyticsDashboard />
+            ) : (
+              <div className="flex flex-col items-center justify-center p-12 border rounded-xl bg-muted/30">
+                <BarChart3 className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-xl font-bold mb-2">Analytics Restricted</h3>
+                <p className="text-muted-foreground mb-6 max-w-md text-center">
+                   Basic analytics is only available in GROWTH, PRO, and ENTERPRISE plans.
+                </p>
+                <Link to="/startup/select-plan">
+                  <Button>Upgrade Plan</Button>
+                </Link>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="advanced">
+            {["advanced", "full", "custom"].includes(getFeatureValue("analytics") as string) ? (
+              <AdvancedJobAnalytics />
+            ) : (
+              <div className="flex flex-col items-center justify-center p-12 border rounded-xl bg-muted/30">
+                <TrendingUp className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-xl font-bold mb-2">Advanced Analytics Restricted</h3>
+                <p className="text-muted-foreground mb-6 max-w-md text-center">
+                   Advanced job analytics is available in PRO and ENTERPRISE plans.
+                </p>
+                <Link to="/startup/select-plan">
+                  <Button>Upgrade Plan</Button>
+                </Link>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        isOpen={isUpgradeModalOpen}
+        onClose={closeUpgradeModal}
+        featureName={triggeredFeature || "Analysis"}
+      />
 
       {/* Profile Modal */}
       <EditStartupProfileModal
         open={profileModalOpen}
         onOpenChange={setProfileModalOpen}
+      />
+      
+      {/* Create Post Modal */}
+      <CreatePostModal
+        open={postModalOpen}
+        onOpenChange={setPostModalOpen}
       />
     </StartupLayout>
   );

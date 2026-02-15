@@ -1,8 +1,8 @@
 // src/lib/api.ts
 
 // export const API_BASE_URL = 'http://localhost:3000/api';
-export const API_BASE_URL = 'https://backend-f3js.onrender.com/api';
-// export const API_BASE_URL = 'http://localhost:3000/api';
+// export const API_BASE_URL = 'https://backend-f3js.onrender.com/api';
+export const API_BASE_URL = 'http://localhost:3000/api';
 
 export const getAuthToken = (): string | null => {
   return localStorage.getItem('auth_token');
@@ -26,20 +26,19 @@ export const setStoredUser = (user: any): void => {
   localStorage.setItem('user', JSON.stringify(user));
 };
 
-export async function apiFetch<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<{ success: boolean; data?: T; error?: string; status?: number; [key: string]: any }> {
+export const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
   const token = getAuthToken();
-  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   
-  // DEBUG: Warn if token is missing for authenticated requests
-  if (!token) {
+  // Define routes that don't require authentication
+  const publicRoutes = ['/auth/signup', '/auth/verify-email', '/auth/resend-verification', '/auth/login'];
+  const isPublic = publicRoutes.some(route => endpoint.includes(route));
+
+  if (!token && !isPublic) {
     console.warn(`[apiFetch] No auth_token found. Request to ${endpoint} might fail.`);
   }
 
   const headers: HeadersInit = {
-    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+    ...(typeof FormData !== 'undefined' && options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
     ...(token && { Authorization: `Bearer ${token}` }),
     ...options.headers,
   };
@@ -67,4 +66,4 @@ export async function apiFetch<T>(
     console.error('API Error:', error);
     return { success: false, error: 'Network error. Please try again.' };
   }
-}
+};

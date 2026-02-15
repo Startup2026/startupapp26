@@ -34,6 +34,8 @@ import { jobService } from "@/services/jobService";
 import { applicationService } from "@/services/applicationService";
 import { toast } from "@/hooks/use-toast";
 import { format, subDays, isSameDay } from "date-fns";
+import { usePlanAccess } from "@/hooks/usePlanAccess";
+import { UpgradeModal } from "@/components/UpgradeModal";
 
 /* ---------------- TYPES ---------------- */
 
@@ -59,6 +61,14 @@ const CHART_COLORS = [
 /* ---------------- PAGE ---------------- */
 
 export default function JobAnalysisPage() {
+  const { 
+    hasAccess, 
+    loading: planLoading, 
+    isUpgradeModalOpen, 
+    closeUpgradeModal, 
+    triggeredFeature,
+    checkAccessAndShowModal
+  } = usePlanAccess();
   const [educationBy, setEducationBy] = useState<"degree" | "college">("degree");
   const [selectedJob, setSelectedJob] = useState<string>("all");
   const [loading, setLoading] = useState(true);
@@ -69,6 +79,10 @@ export default function JobAnalysisPage() {
 
   useEffect(() => {
     const fetchJobs = async () => {
+        if (!hasAccess("jobAnalysis")) {
+            setLoading(false);
+            return;
+        }
         try {
             const profileRes = await startupProfileService.getMyProfile();
             if(!profileRes.success || !profileRes.data) return;
@@ -85,10 +99,14 @@ export default function JobAnalysisPage() {
         } catch(e) { console.error(e); }
     };
     fetchJobs();
-  }, []);
+  }, [hasAccess]);
 
   useEffect(() => {
     const fetchAnalytics = async () => {
+        if (!hasAccess("jobAnalysis")) {
+            setLoading(false);
+            return;
+        }
         try {
             setLoading(true);
             const res = await applicationService.getHiringAnalytics(selectedJob);
@@ -104,7 +122,35 @@ export default function JobAnalysisPage() {
     };
 
     fetchAnalytics();
-  }, [selectedJob]);
+  }, [selectedJob, hasAccess]);
+
+  if (planLoading) {
+    return (
+      <StartupLayout>
+        <div className="h-[60vh] flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </StartupLayout>
+    );
+  }
+
+  if (!hasAccess("jobAnalysis")) {
+    return (
+      <StartupLayout>
+          <div className="h-[70vh] flex flex-col items-center justify-center text-center p-6 bg-card rounded-xl border-2 border-dashed">
+              <BarChart3 className="h-16 w-16 text-muted-foreground mb-4" />
+              <h2 className="text-2xl font-bold mb-2">Unlock Advanced Job Analysis</h2>
+              <p className="text-muted-foreground max-w-md mb-6">
+                  Deep dive into your hiring performance, candidate demographics, and application trends. 
+                  Upgrade to Growth, Pro or Enterprise plan to access this feature.
+              </p>
+              <Button size="lg" onClick={() => (window.location.href = "/startup/select-plan")}>
+                  Upgrade to Premium
+              </Button>
+          </div>
+      </StartupLayout>
+    );
+  }
 
   const handleExport = () => {
     if (!analyticsData) return;
@@ -445,6 +491,7 @@ export default function JobAnalysisPage() {
           </Card>
         </div>
       </div>
+      <UpgradeModal isOpen={isUpgradeModalOpen} onClose={closeUpgradeModal} featureName={triggeredFeature || "Job Analytics"} />
     </StartupLayout>
   );
 }

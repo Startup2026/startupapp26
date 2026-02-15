@@ -1,4 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import {
   Heart,
   MessageCircle,
@@ -10,7 +11,9 @@ import {
   Video,
   FileText,
   User,
+  Loader2,
 } from "lucide-react";
+import { postService, Post } from "@/services/postService";
 import { StartupLayout } from "@/components/layouts/StartupLayout";
 import {
   Card,
@@ -23,117 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
-/* ---- Mock data (same source, will be replaced by API) ---- */
-const mockPosts = [
-  {
-    _id: "1",
-    title: "Excited to announce our Series A!",
-    description:
-      "We just closed our Series A funding round. It's been an incredible journey building this product, and we're grateful for the support of our investors, team, and community. This funding will help us scale to new markets and double our engineering team.",
-    media: { photo: "https://picsum.photos/seed/post1/800/400" },
-    likes: Array(124).fill("userId"),
-    comments: [
-      { user: "u1", text: "Congrats! Well deserved 🎉", createdAt: new Date("2026-02-08T12:00:00Z") },
-      { user: "u2", text: "Amazing milestone!", createdAt: new Date("2026-02-08T13:30:00Z") },
-      { user: "u3", text: "Looking forward to seeing what's next", createdAt: new Date("2026-02-08T14:00:00Z") },
-      { user: "u4", text: "Great team, great product!", createdAt: new Date("2026-02-09T09:00:00Z") },
-    ],
-    createdAt: "2026-02-08T10:00:00Z",
-    updatedAt: "2026-02-08T10:00:00Z",
-  },
-  {
-    _id: "2",
-    title: "Behind the scenes of our product sprint",
-    description:
-      "Take a look at how our engineering team works through a two-week sprint cycle. From ideation to deployment, every step is carefully planned and executed with precision.",
-    media: { video: "https://example.com/video.mp4" },
-    likes: Array(98).fill("userId"),
-    comments: [
-      { user: "u1", text: "Great insight into the process!", createdAt: new Date("2026-02-05T15:00:00Z") },
-      { user: "u2", text: "Would love to join your team", createdAt: new Date("2026-02-05T16:30:00Z") },
-    ],
-    createdAt: "2026-02-05T14:30:00Z",
-    updatedAt: "2026-02-05T14:30:00Z",
-  },
-  {
-    _id: "3",
-    title: "Meet our new CTO",
-    description:
-      "We're thrilled to welcome our new CTO who brings 15 years of experience building scalable systems at top tech companies.",
-    media: { photo: "https://picsum.photos/seed/post3/800/400" },
-    likes: Array(210).fill("userId"),
-    comments: [
-      { user: "u1", text: "Welcome aboard!", createdAt: new Date("2026-02-01T10:00:00Z") },
-      { user: "u2", text: "Strong hire 💪", createdAt: new Date("2026-02-01T11:00:00Z") },
-      { user: "u3", text: "Excited for the future!", createdAt: new Date("2026-02-01T12:00:00Z") },
-    ],
-    createdAt: "2026-02-01T09:00:00Z",
-    updatedAt: "2026-02-01T09:00:00Z",
-  },
-  {
-    _id: "4",
-    title: "Our journey to 10k users",
-    description: "A milestone we're proud of. Here's how we got here and what we learned along the way.",
-    media: { photo: "https://picsum.photos/seed/post4/800/400" },
-    likes: Array(175).fill("userId"),
-    comments: [
-      { user: "u1", text: "Amazing growth!", createdAt: new Date("2026-01-28T12:00:00Z") },
-    ],
-    createdAt: "2026-01-28T11:00:00Z",
-    updatedAt: "2026-01-28T11:00:00Z",
-  },
-  {
-    _id: "5",
-    title: "Team offsite recap",
-    description: "What a week it has been. Our team gathered for a productive offsite filled with brainstorming and bonding.",
-    media: { video: "https://example.com/video2.mp4" },
-    likes: Array(67).fill("userId"),
-    comments: [
-      { user: "u1", text: "Love it!", createdAt: new Date("2026-01-20T17:00:00Z") },
-    ],
-    createdAt: "2026-01-20T16:00:00Z",
-    updatedAt: "2026-01-20T16:00:00Z",
-  },
-  {
-    _id: "6",
-    title: "Product update: Dark mode is here",
-    description: "We listened to your feedback and shipped dark mode. Try it out and let us know what you think!",
-    media: { photo: "https://picsum.photos/seed/post6/800/400" },
-    likes: Array(156).fill("userId"),
-    comments: [
-      { user: "u1", text: "Finally!", createdAt: new Date("2026-01-15T09:00:00Z") },
-      { user: "u2", text: "Looks gorgeous", createdAt: new Date("2026-01-15T10:00:00Z") },
-    ],
-    createdAt: "2026-01-15T08:00:00Z",
-    updatedAt: "2026-01-15T08:00:00Z",
-  },
-  {
-    _id: "7",
-    title: "Why we chose React Native",
-    description: "A deep dive into our tech stack decisions and why React Native was the right call for our mobile strategy.",
-    media: {},
-    likes: Array(89).fill("userId"),
-    comments: [
-      { user: "u1", text: "Interesting read!", createdAt: new Date("2026-01-10T14:00:00Z") },
-    ],
-    createdAt: "2026-01-10T13:00:00Z",
-    updatedAt: "2026-01-10T13:00:00Z",
-  },
-  {
-    _id: "8",
-    title: "Hiring: We're looking for designers",
-    description: "Join our growing design team. We're looking for passionate product designers who love crafting intuitive user experiences.",
-    media: { photo: "https://picsum.photos/seed/post8/800/400" },
-    likes: Array(45).fill("userId"),
-    comments: [
-      { user: "u1", text: "Shared with my network!", createdAt: new Date("2026-01-05T11:00:00Z") },
-    ],
-    createdAt: "2026-01-05T10:30:00Z",
-    updatedAt: "2026-01-05T10:30:00Z",
-  },
-];
-
-function getPostType(post: (typeof mockPosts)[0]): "photo" | "video" | "text" {
+function getPostType(post: Post): "photo" | "video" | "text" {
   if (post.media?.video) return "video";
   if (post.media?.photo) return "photo";
   return "text";
@@ -142,8 +35,36 @@ function getPostType(post: (typeof mockPosts)[0]): "photo" | "video" | "text" {
 export default function PostDetailPage() {
   const { postId } = useParams();
   const navigate = useNavigate();
+  const [post, setPost] = useState<Post | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const post = mockPosts.find((p) => p._id === postId);
+  useEffect(() => {
+    const fetchPost = async () => {
+      if (!postId) return;
+      try {
+        setLoading(true);
+        const result = await postService.getPostById(postId);
+        if (result.success && result.data) {
+          setPost(result.data);
+        }
+      } catch (error) {
+        console.error("Error fetching post:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPost();
+  }, [postId]);
+
+  if (loading) {
+    return (
+        <StartupLayout>
+            <div className="flex bg-background h-[calc(100vh-4rem)] items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-accent" />
+            </div>
+        </StartupLayout>
+    )
+  }
 
   if (!post) {
     return (
@@ -160,9 +81,9 @@ export default function PostDetailPage() {
   }
 
   const type = getPostType(post);
-  const engagement = post.likes.length + post.comments.length;
+  const engagement = (post.likes?.length || 0) + (post.comments?.length || 0);
   const created = new Date(post.createdAt);
-  const updated = new Date(post.updatedAt);
+  const updated = post.updatedAt ? new Date(post.updatedAt) : created;
 
   return (
     <StartupLayout>

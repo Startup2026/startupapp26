@@ -177,10 +177,9 @@ export function StudentLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen flex w-full bg-background overflow-hidden">
-      <aside className="hidden lg:flex lg:w-64 flex-col bg-sidebar border-r border-sidebar-border sticky top-0 h-screen shrink-0">
-        <div className="p-6 flex items-center gap-3">
-          <Logo size="sm" />
-          <span className="text-xl font-bold tracking-tight text-sidebar-foreground">Wostup</span>
+      <aside className="hidden lg:flex lg:w-64 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border sticky top-0 h-screen shrink-0">
+        <div className="p-6">
+          <Logo size="sm" variant="light" />
         </div>
         <div className="flex-1 px-4 overflow-y-auto">
           <NavLinks />
@@ -228,10 +227,9 @@ export function StudentLayout({ children }: { children: ReactNode }) {
                   <Menu className="h-6 w-6" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[280px] p-0 bg-sidebar border-r-0">
-                <div className="p-6 border-b border-sidebar-border flex items-center gap-3">
-                  <Logo size="sm" />
-                  <span className="text-xl font-bold text-sidebar-foreground">Wostup</span>
+              <SheetContent side="left" className="w-[280px] p-0 bg-sidebar text-sidebar-foreground border-r-0">
+                <div className="p-6 border-b border-sidebar-border">
+                  <Logo size="sm" variant="light" />
                 </div>
                 <div className="px-4 py-6 flex flex-col h-[calc(100vh-80px)]">
                   <NavLinks isMobile />
@@ -270,9 +268,8 @@ export function StudentLayout({ children }: { children: ReactNode }) {
               </SheetContent>
             </Sheet>
             
-            <div className="lg:hidden flex items-center gap-2">
+            <div className="lg:hidden">
               <Logo size="xs" />
-              <span className="text-lg font-bold">Wostup</span>
             </div>
           </div>
           

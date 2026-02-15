@@ -18,8 +18,18 @@ import { jobService, Job } from "@/services/jobService";
 import { startupProfileService } from "@/services/startupProfileService";
 import { applicationService, Application } from "@/services/applicationService";
 import { formatDistanceToNow } from "date-fns";
+import { usePlanAccess } from "@/hooks/usePlanAccess";
+import { UpgradeModal } from "@/components/UpgradeModal";
 
 export default function StartupJobsPage() {
+  const { 
+    hasAccess, 
+    getFeatureValue, 
+    isUpgradeModalOpen, 
+    closeUpgradeModal, 
+    checkAccessAndShowModal,
+    triggeredFeature 
+  } = usePlanAccess();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,6 +103,15 @@ export default function StartupJobsPage() {
       }).length;
   };
 
+  const handleOpenCreateModal = () => {
+    const limit = getFeatureValue("maxActiveJobs") as number;
+    if (jobs.length >= limit) {
+      checkAccessAndShowModal("maxActiveJobs", "Multiple Active Jobs");
+      return;
+    }
+    setCreateModalOpen(true);
+  };
+
   // Helper to delete job
   const handleDeleteJob = async (id: string, e: React.MouseEvent) => {
       e.preventDefault(); // prevent navigation
@@ -142,7 +161,7 @@ export default function StartupJobsPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Button onClick={() => setCreateModalOpen(true)} className="bg-accent text-accent-foreground hover:bg-accent/90">
+            <Button onClick={handleOpenCreateModal} className="bg-accent text-accent-foreground hover:bg-accent/90">
               <Plus className="h-4 w-4 mr-2" />
               Post Job
             </Button>
@@ -258,6 +277,7 @@ export default function StartupJobsPage() {
 
         {/* Create Job Modal */}
         <CreateJobModal open={createModalOpen} onOpenChange={setCreateModalOpen} onJobCreated={fetchData} />
+        <UpgradeModal isOpen={isUpgradeModalOpen} onClose={closeUpgradeModal} featureName={triggeredFeature} />
       </div>
     </StartupLayout>
   );

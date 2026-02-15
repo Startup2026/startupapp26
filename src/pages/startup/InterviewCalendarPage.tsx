@@ -6,14 +6,29 @@ import { InterviewCalendar, Interview } from "@/components/startup/InterviewCale
 import { InterviewDetailPanel } from "@/components/startup/InterviewDetailPanel";
 import { interviewService } from "@/services/interviewService";
 import { toast } from "@/hooks/use-toast";
+import { usePlanAccess } from "@/hooks/usePlanAccess";
+import { UpgradeModal } from "@/components/UpgradeModal";
+import { Button } from "@/components/ui/button";
 
 export default function InterviewCalendarPage() {
+  const { 
+    hasAccess, 
+    loading: planLoading, 
+    isUpgradeModalOpen, 
+    closeUpgradeModal, 
+    triggeredFeature,
+    checkAccessAndShowModal
+  } = usePlanAccess();
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [selectedInterview, setSelectedInterview] = useState<Interview | null>(null);
   const [detailPanelOpen, setDetailPanelOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const fetchInterviews = async () => {
+    if (!hasAccess("interviewCalendar")) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const res = await interviewService.getAllInterviews();
@@ -57,7 +72,7 @@ export default function InterviewCalendarPage() {
 
   useEffect(() => {
     fetchInterviews();
-  }, []);
+  }, [hasAccess]);
 
   const handleInterviewClick = (interview: Interview) => {
     setSelectedInterview(interview);
@@ -96,14 +111,32 @@ export default function InterviewCalendarPage() {
     }
   };
 
-  if (loading) {
+  if (loading || planLoading) {
       return (
           <StartupLayout>
               <div className="flex bg-background h-[calc(100vh-4rem)] items-center justify-center">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
           </StartupLayout>
-      )
+      );
+  }
+
+  if (!hasAccess("interviewCalendar")) {
+    return (
+      <StartupLayout>
+          <div className="h-[70vh] flex flex-col items-center justify-center text-center p-6 bg-card rounded-xl border-2 border-dashed">
+              <CalendarIcon className="h-16 w-16 text-muted-foreground mb-4" />
+              <h2 className="text-2xl font-bold mb-2">Centralized Interview Management</h2>
+              <p className="text-muted-foreground max-w-md mb-6">
+                  Schedule, manage, and track all your candidate interviews in one place. 
+                  Upgrade to Growth or Pro plan to access this feature.
+              </p>
+              <Button size="lg" onClick={() => navigate("/startup/select-plan")}>
+                  Upgrade to Premium
+              </Button>
+          </div>
+      </StartupLayout>
+    );
   }
 
   return (
@@ -174,6 +207,7 @@ export default function InterviewCalendarPage() {
           onReschedule={handleRescheduleUpdate}
         />
       </div>
+      <UpgradeModal isOpen={isUpgradeModalOpen} onClose={closeUpgradeModal} featureName={triggeredFeature || "Interview Calendar"} />
     </StartupLayout>
   );
 }
