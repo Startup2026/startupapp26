@@ -105,7 +105,8 @@ export default function StartupJobsPage() {
 
   const handleOpenCreateModal = () => {
     const limit = getFeatureValue("maxActiveJobs") as number;
-    if (jobs.length >= limit) {
+    // Ensure limit is a valid number (loaded) before blocking
+    if (typeof limit === 'number' && jobs.length >= limit) {
       checkAccessAndShowModal("maxActiveJobs", "Multiple Active Jobs");
       return;
     }
