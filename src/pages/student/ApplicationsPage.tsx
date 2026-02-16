@@ -26,7 +26,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useSocket } from "@/contexts/SocketContext";
 import { useToast } from "@/hooks/use-toast";
 
-type ApplicationStatus = "applied" | "shortlisted" | "rejected" | "all";
+type ApplicationStatus = "applied" | "shortlisted" | "rejected" | "selected" | "interview" | "all";
 
 interface Application {
   _id: string;
@@ -56,6 +56,16 @@ const statusConfig: any = {
   shortlisted: {
     label: "Shortlisted",
     color: "bg-accent/10 text-accent border-accent/20",
+    icon: CheckCircle2,
+  },
+  interview: {
+    label: "Interview",
+    color: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+    icon: Calendar,
+  },
+  selected: {
+    label: "Selected",
+    color: "bg-green-500/10 text-green-400 border-green-500/20",
     icon: CheckCircle2,
   },
   rejected: {
@@ -124,7 +134,9 @@ export default function ApplicationsPage() {
     const company = app?.jobId?.startupId?.startupName || "Unknown Company";
     
     // Normalize status from backend (UPPERCASE) to frontend (lowercase) for filtering
-    const appStatus = app.status ? app.status.toLowerCase() : "applied";
+    let appStatus = app.status ? app.status.toLowerCase() : "applied";
+    if (app.status?.toUpperCase() === "INTERVIEW_SCHEDULED") appStatus = "interview";
+    if (app.status?.toUpperCase() === "SELECTED" || app.status?.toUpperCase() === "HIRED") appStatus = "selected";
 
     const matchesSearch =
       jobTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -135,13 +147,20 @@ export default function ApplicationsPage() {
     return matchesSearch && matchesStatus;
   });
 
-  const getStatusKey = (status: string) => status ? status.toLowerCase() : "applied";
+  const getStatusKey = (status: string) => {
+    if (!status) return "applied";
+    if (status.toUpperCase() === "INTERVIEW_SCHEDULED") return "interview";
+    if (status.toUpperCase() === "SELECTED" || status.toUpperCase() === "HIRED") return "selected";
+    return status.toLowerCase();
+  };
 
   const statusCounts = {
     all: applications.length,
-    applied: applications.filter((a) => a.status === "APPLIED").length,
-    shortlisted: applications.filter((a) => a.status === "SHORTLISTED").length,
-    rejected: applications.filter((a) => a.status === "REJECTED").length,
+    applied: applications.filter((a) => !a.status || a.status.toUpperCase() === "APPLIED").length,
+    shortlisted: applications.filter((a) => a.status && a.status.toUpperCase() === "SHORTLISTED").length,
+    interview: applications.filter((a) => a.status && a.status.toUpperCase() === "INTERVIEW_SCHEDULED").length,
+    selected: applications.filter((a) => a.status && ["SELECTED", "HIRED"].includes(a.status.toUpperCase())).length,
+    rejected: applications.filter((a) => a.status && a.status.toUpperCase() === "REJECTED").length,
   };
 
   return (
@@ -159,7 +178,7 @@ export default function ApplicationsPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {(["all", "applied", "shortlisted", "rejected"] as const).map((status) => {
+          {(["all", "applied", "shortlisted", "interview", "selected", "rejected"] as const).map((status) => {
             const isActive = statusFilter === status;
             const config = status === "all" ? null : statusConfig[status];
             
@@ -184,7 +203,10 @@ export default function ApplicationsPage() {
                     {config ? (
                       <config.icon className={`h-8 w-8 ${
                         status === "applied" ? "text-blue-400" :
-                        status === "shortlisted" ? "text-accent" : "text-destructive"
+                        status === "shortlisted" ? "text-accent" : 
+                        status === "selected" ? "text-green-400" :
+                        status === "interview" ? "text-purple-400" :
+                        "text-destructive"
                       }`} />
                     ) : (
                       <FileText className="h-8 w-8 text-muted-foreground" />
@@ -220,6 +242,8 @@ export default function ApplicationsPage() {
                   <SelectItem value="all">All Applications</SelectItem>
                   <SelectItem value="applied">Applied</SelectItem>
                   <SelectItem value="shortlisted">Shortlisted</SelectItem>
+                  <SelectItem value="interview">Interview</SelectItem>
+                  <SelectItem value="selected">Selected</SelectItem>
                   <SelectItem value="rejected">Rejected</SelectItem>
                 </SelectContent>
               </Select>
