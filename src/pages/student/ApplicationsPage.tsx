@@ -44,6 +44,7 @@ interface Application {
   studentId: string;
   atsScore: number;
   status: string; // "APPLIED", "SHORTLISTED", "REJECTED"
+  statusVisible?: boolean; // New field from backend
   createdAt: string;
 }
 
@@ -133,10 +134,15 @@ export default function ApplicationsPage() {
     const jobTitle = app?.jobId?.role || "Unknown Role";
     const company = app?.jobId?.startupId?.startupName || "Unknown Company";
     
+    // Check visibility logic: If status is not visible to student, show as 'applied'
+    // We check statusVisible (explicit flag) OR fallback to isNotified (if present) OR if actual status is APPLIED
+    const isVisible = app.statusVisible || (app as any).isNotified || app.status === "APPLIED";
+    const effectiveStatus = isVisible ? app.status : "APPLIED";
+
     // Normalize status from backend (UPPERCASE) to frontend (lowercase) for filtering
-    let appStatus = app.status ? app.status.toLowerCase() : "applied";
-    if (app.status?.toUpperCase() === "INTERVIEW_SCHEDULED") appStatus = "interview";
-    if (app.status?.toUpperCase() === "SELECTED" || app.status?.toUpperCase() === "HIRED") appStatus = "selected";
+    let appStatus = effectiveStatus ? effectiveStatus.toLowerCase() : "applied";
+    if (effectiveStatus?.toUpperCase() === "INTERVIEW_SCHEDULED") appStatus = "interview";
+    if (effectiveStatus?.toUpperCase() === "SELECTED" || effectiveStatus?.toUpperCase() === "HIRED") appStatus = "selected";
 
     const matchesSearch =
       jobTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -147,7 +153,10 @@ export default function ApplicationsPage() {
     return matchesSearch && matchesStatus;
   });
 
-  const getStatusKey = (status: string) => {
+  const getStatusKey = (status: string, isVisible: boolean = true) => {
+    // If not visible and not 'APPLIED', force to 'applied' key
+    if (!isVisible && status !== "APPLIED") return "applied";
+    
     if (!status) return "applied";
     if (status.toUpperCase() === "INTERVIEW_SCHEDULED") return "interview";
     if (status.toUpperCase() === "SELECTED" || status.toUpperCase() === "HIRED") return "selected";
@@ -156,11 +165,27 @@ export default function ApplicationsPage() {
 
   const statusCounts = {
     all: applications.length,
-    applied: applications.filter((a) => !a.status || a.status.toUpperCase() === "APPLIED").length,
-    shortlisted: applications.filter((a) => a.status && a.status.toUpperCase() === "SHORTLISTED").length,
-    interview: applications.filter((a) => a.status && a.status.toUpperCase() === "INTERVIEW_SCHEDULED").length,
-    selected: applications.filter((a) => a.status && ["SELECTED", "HIRED"].includes(a.status.toUpperCase())).length,
-    rejected: applications.filter((a) => a.status && a.status.toUpperCase() === "REJECTED").length,
+    applied: applications.filter((a) => {
+      const isVisible = a.statusVisible || (a as any).isNotified || a.status === "APPLIED";
+      const status = isVisible ? a.status : "APPLIED";
+      return !status || status.toUpperCase() === "APPLIED";
+    }).length,
+    shortlisted: applications.filter((a) => {
+       const isVisible = a.statusVisible || (a as any).isNotified || a.status === "APPLIED";
+       return isVisible && a.status && a.status.toUpperCase() === "SHORTLISTED";
+    }).length,
+    interview: applications.filter((a) => {
+       const isVisible = a.statusVisible || (a as any).isNotified || a.status === "APPLIED";
+       return isVisible && a.status && a.status.toUpperCase() === "INTERVIEW_SCHEDULED";
+    }).length,
+    selected: applications.filter((a) => {
+       const isVisible = a.statusVisible || (a as any).isNotified || a.status === "APPLIED";
+       return isVisible && a.status && ["SELECTED", "HIRED"].includes(a.status.toUpperCase());
+    }).length,
+    rejected: applications.filter((a) => {
+       const isVisible = a.statusVisible || (a as any).isNotified || a.status === "APPLIED";
+       return isVisible && a.status && a.status.toUpperCase() === "REJECTED";
+    }).length,
   };
 
   return (
@@ -261,7 +286,9 @@ export default function ApplicationsPage() {
             </div>
           ) : (
             filteredApplications.map((app) => {
-              const statusKey = getStatusKey(app.status);
+              const isStatusVisible = app.statusVisible || (app as any).isNotified || app.status === "APPLIED";
+              const effectiveStatus = isStatusVisible ? app.status : "APPLIED";
+              const statusKey = getStatusKey(effectiveStatus, true); // effectiveStatus is already filtered, pass true
               const config = statusConfig[statusKey] || statusConfig['applied'];
               
               return (

@@ -81,20 +81,36 @@ export default function StudentDashboard() {
   const updateStats = (apps: any[]) => {
     setStats({
       total: apps.length,
-      shortlisted: apps.filter((a: any) => ["SHORTLISTED", "INTERVIEW_SCHEDULED", "SELECTED", "HIRED"].includes(a.status)).length,
-      pending: apps.filter((a: any) => a.status === "APPLIED" || !a.status).length,
-      rejected: apps.filter((a: any) => a.status === "REJECTED").length
+      shortlisted: apps.filter((a: any) => {
+        const isVisible = a.statusVisible || a.isNotified || a.status === "APPLIED";
+        return isVisible && ["SHORTLISTED", "INTERVIEW_SCHEDULED", "SELECTED", "HIRED"].includes(a.status);
+      }).length,
+      pending: apps.filter((a: any) => {
+        // If status is not visible, it counts as pending/applied
+        const isVisible = a.statusVisible || a.isNotified || a.status === "APPLIED";
+        return !isVisible || a.status === "APPLIED" || !a.status;
+      }).length,
+      rejected: apps.filter((a: any) => {
+        const isVisible = a.statusVisible || a.isNotified || a.status === "APPLIED";
+        return isVisible && a.status === "REJECTED";
+      }).length
     });
   };
 
   useEffect(() => {
     if (!socket) return;
 
-    const handleStatusUpdate = (data: { applicationId: string, status: string, jobRole?: string, company?: string }) => {
+    const handleStatusUpdate = (data: { applicationId: string, status: string, jobRole?: string, company?: string, isNotified?: boolean, statusVisible?: boolean }) => {
+      // Only show update if notified or visible
+      if (!data.isNotified && !data.statusVisible && data.status !== "APPLIED") {
+        return; 
+      }
+
       setApplications(prev => {
-        const updated = prev.map(app => (app._id === data.applicationId ? { ...app, status: data.status } : app));
+        const updated = prev.map(app => (app._id === data.applicationId ? { ...app, status: data.status, isNotified: data.isNotified, statusVisible: data.statusVisible } : app));
         // We only have the first 3 in state, but status updates could affect stats
         // So we might need to refresh stats or have all apps in a hidden state
+        updateStats(updated); // Update stats directly with new data locally to reflect immediately if visible
         return updated;
       });
 

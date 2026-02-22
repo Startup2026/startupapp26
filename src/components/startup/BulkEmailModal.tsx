@@ -52,6 +52,7 @@ export function BulkEmailModal({
   const [selectedIds, setSelectedIds] = useState<string[]>(preselectedIds);
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
   const [sending, setSending] = useState(false);
 
   // Interview States
@@ -67,6 +68,7 @@ export function BulkEmailModal({
       setSelectedIds(preselectedIds);
       setSubject("");
       setMessage("");
+      setSelectedTemplate("");
       setIsInterview(false);
       setInterviewDate("");
       setInterviewTime("");
@@ -80,8 +82,15 @@ export function BulkEmailModal({
     templateSubject: string,
     templateBody: string
   ) => {
+    setSelectedTemplate(template);
     setSubject(templateSubject);
     setMessage(templateBody);
+
+    if (template === "interview") {
+      setIsInterview(true);
+    } else {
+      setIsInterview(false);
+    }
   };
 
   const handleSend = async () => {
@@ -130,7 +139,8 @@ export function BulkEmailModal({
         message: message.trim(),
         applicationIdList: selectedIds,
         isInterview,
-        interviewDetails
+        interviewDetails,
+        template: selectedTemplate
       }),
     });
 
