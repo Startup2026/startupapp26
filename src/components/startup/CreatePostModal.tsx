@@ -1,7 +1,7 @@
 
 
 
-import { useState, ChangeEvent } from "react";
+import { useState, ChangeEvent, useEffect } from "react";
 import { FileText, Image, Video, Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -20,6 +20,11 @@ interface CreatePostModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  initialData?: {
+    id: string;
+    title: string;
+    description: string;
+  };
 }
 
 interface PostFormData {
@@ -29,14 +34,27 @@ interface PostFormData {
   video: File | null;
 }
 
-export function CreatePostModal({ open, onOpenChange, onSuccess }: CreatePostModalProps) {
-  const [formData, setFormData] = useState<PostFormData>({
+export function CreatePostModal({ open, onOpenChange, onSuccess, initialData }: CreatePostModalProps) {
+  const [formData, setFormData] = useState<any>({
     title: "",
     description: "",
     image: null,
     video: null,
   });
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Initialize form data when modal opens or initialData changes
+  useEffect(() => {
+    if (open) {
+      setFormData({
+        title: initialData?.title || "",
+        description: initialData?.description || "",
+        image: null,
+        video: null,
+      });
+    }
+  }, [open, initialData]);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -65,17 +83,23 @@ export function CreatePostModal({ open, onOpenChange, onSuccess }: CreatePostMod
       if (formData.image) data.append("image", formData.image);
       if (formData.video) data.append("video", formData.video);
 
-      const result = await postService.createPost(data);
+      let result;
+      if (initialData?.id) {
+        result = await postService.updatePost(initialData.id, data);
+      } else {
+        result = await postService.createPost(data);
+      }
+
       if (result.success) {
         toast({
-          title: "Post Published",
-          description: "Your update has been shared with students.",
+          title: initialData ? "Post Updated" : "Post Published",
+          description: initialData ? "Your post has been updated." : "Your update has been shared with students.",
         });
         onOpenChange(false);
         setFormData({ title: "", description: "", image: null, video: null });
         if (onSuccess) onSuccess();
       } else {
-          toast({ title: "Failed", description: result.error || "Could not create post", variant: "destructive" });
+          toast({ title: "Failed", description: result.error || "Could not process request", variant: "destructive" });
       }
     } catch (error) {
       console.error("Post creation error:", error);
@@ -91,7 +115,7 @@ export function CreatePostModal({ open, onOpenChange, onSuccess }: CreatePostMod
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <FileText className="h-5 w-5 text-accent" />
-            Create Post
+            {initialData ? "Edit Post" : "Create New Post"}
           </DialogTitle>
         </DialogHeader>
 
@@ -159,9 +183,9 @@ export function CreatePostModal({ open, onOpenChange, onSuccess }: CreatePostMod
               {isSubmitting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Posting...
+                    {initialData ? "Updating..." : "Posting..."}
                   </>
-              ) : "Post Now"}
+              ) : (initialData ? "Update Post" : "Post Now")}
             </Button>
           </div>
         </form>

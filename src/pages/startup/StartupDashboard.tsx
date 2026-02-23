@@ -29,7 +29,9 @@ import { startupProfileService, StartupProfile } from "@/services/startupProfile
 import { jobService, Job } from "@/services/jobService";
 import { applicationService, Application } from "@/services/applicationService";
 import { interviewService } from "@/services/interviewService";
+import { postService, Post } from "@/services/postService";
 import { useAuth } from "@/contexts/AuthContext";
+import { API_BASE_URL } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { usePlanAccess } from "@/hooks/usePlanAccess";
 import { UpgradeModal } from "@/components/UpgradeModal";
@@ -51,9 +53,11 @@ export default function StartupDashboard() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [interviews, setInterviews] = useState<any[]>([]);
+  const [myPosts, setMyPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
+  const BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -110,6 +114,18 @@ export default function StartupDashboard() {
             }
           } else {
             setInterviews([]); // Default to empty if no access
+          }
+
+          // 5. Fetch Posts
+          try {
+             // We need to implement getStartupPosts in postService
+             // Assuming endpoint is '/posts/get-startup-posts'
+             const postsRes = await postService.getStartupPosts();
+             if (postsRes.success && postsRes.data) {
+                setMyPosts(postsRes.data);
+             }
+          } catch (postErr) {
+             console.warn("Could not fetch posts:", postErr);
           }
         }
 
@@ -208,7 +224,7 @@ export default function StartupDashboard() {
               onClick={() => setProfileModalOpen(true)}
             >
              {profile?.profilepic ? (
-                <img src={profile.profilepic} alt={profile.startupName} className="h-full w-full object-cover rounded-2xl" />
+                <img src={`${BASE_URL}${profile.profilepic}`} alt={profile.startupName} className="h-full w-full object-cover rounded-2xl" />
               ) : (
                 profile ? getInitials(profile.startupName) : "..."
               )}
@@ -246,9 +262,11 @@ export default function StartupDashboard() {
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="bg-background/50 border border-border p-1">
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="posts">My Posts</TabsTrigger>
             <TabsTrigger value="analytics">Hiring Summary</TabsTrigger>
             <TabsTrigger value="advanced">Advanced Job Analytics</TabsTrigger>
           </TabsList>
+
 
           <TabsContent value="overview" className="space-y-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -495,6 +513,77 @@ export default function StartupDashboard() {
             </CardContent>
           </Card>
         </div>
+          </TabsContent>
+
+          <TabsContent value="posts" className="space-y-8">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-accent" />
+                  My Posts
+                </CardTitle>
+                <Button variant="outline" onClick={() => setPostModalOpen(true)}>
+                  Create New Post
+                </Button>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {myPosts.length === 0 ? (
+                  <div className="col-span-full py-12 text-center text-muted-foreground border-2 border-dashed rounded-xl">
+                    <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <h3 className="text-xl font-bold mb-2">No posts yet</h3>
+                    <p>Share your updates with the community!</p>
+                  </div>
+                ) : (
+                  myPosts.map((post) => (
+                    <div key={post._id} className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full bg-card">
+                      {/* Image - Correctly constructed URL */}
+                      {post.media?.photo && (
+                        <div className="w-full aspect-video bg-muted relative group">
+                            <img
+                            src={`${BASE_URL}${post.media.photo}`}
+                            alt={post.title || "Post image"}
+                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                            onError={(e) => {
+                                // Hide broken images but keep the layout stable if possible
+                                (e.target as HTMLImageElement).src = 'https://placehold.co/600x400?text=Image+Unavailable';
+                            }}
+                            />
+                        </div>
+                      )}
+                      
+                      <div className="p-4 flex flex-col flex-1">
+                        <div className="flex items-center justify-between mb-2">
+                          <Badge variant="outline" className="text-xs">
+                             {/* Since 'type' might be buried in the post model or inferred, just show Update */}
+                             Update
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
+                          </span>
+                        </div>
+
+                        <h3 className="font-bold text-lg mb-2 line-clamp-2">{post.title || "Untitled"}</h3>
+                        <p className="text-muted-foreground text-sm line-clamp-3 mb-4 flex-1">
+                          {post.description}
+                        </p>
+
+                        <div className="flex items-center justify-between pt-4 border-t mt-auto text-xs text-muted-foreground">
+                          <div className="flex items-center gap-3">
+                             <span className="flex items-center gap-1">
+                               <Users className="h-3 w-3" /> {post.likes?.length || 0}
+                             </span>
+                             <span className="flex items-center gap-1">
+                               <FileText className="h-3 w-3" /> {post.comments?.length || 0}
+                             </span>
+                          </div>
+                          {/* Could add Edit/Delete here later */}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="analytics">

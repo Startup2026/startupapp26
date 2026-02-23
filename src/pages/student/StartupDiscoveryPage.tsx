@@ -13,7 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { apiFetch, getStoredUser } from "@/lib/api";
+import { apiFetch, getStoredUser, API_BASE_URL } from "@/lib/api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -37,6 +37,7 @@ export default function StartupDiscoveryPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const user = getStoredUser();
+  const BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 
   // --- Fetch Recommendations ---
   useEffect(() => {
@@ -84,7 +85,7 @@ export default function StartupDiscoveryPage() {
     return {
       id: item._id,
       name: item.startupName || "Startup",
-      logo: item.profilepic, 
+      logo: item.profilepic ? `${BASE_URL}${item.profilepic}` : "",
       domain: item.industry || "General",
       location: locationStr,
       tagline: item.tagline || "Building the future",

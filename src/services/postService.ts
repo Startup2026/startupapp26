@@ -37,6 +37,11 @@ export const postService = {
   deletePost: async (id: string) => {
     return apiFetch<void>(`/posts/delete-post/${id}`, {
       method: "DELETE",
-    });
-  },
+    });  },
+
+  updatePost: async (id: string, formData: FormData) => {
+    return apiFetch<Post>(`/posts/update-post/${id}`, {
+      method: "PUT",
+      body: formData,
+    });  },
 };

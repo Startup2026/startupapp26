@@ -20,7 +20,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { apiFetch, getStoredUser } from "@/lib/api";
+import { apiFetch, getStoredUser, API_BASE_URL } from "@/lib/api";
 import { studentProfileService } from "@/services/studentProfileService";
 import { calculateProfileCompletion } from "@/lib/utils";
 import { useSocket } from "@/contexts/SocketContext";
@@ -68,7 +68,8 @@ export default function StudentDashboard() {
   const { socket } = useSocket();
   const { logout } = useAuth();
   const { toast } = useToast();
-  
+  const BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -313,7 +314,7 @@ export default function StudentDashboard() {
                     <CardContent className="p-4 flex items-center gap-4">
                       <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center font-bold text-accent shrink-0">
                         {app.jobId?.startupId?.profilepic ? (
-                          <img src={app.jobId.startupId.profilepic} className="rounded-lg w-full h-full object-cover" />
+                          <img src={`${BASE_URL}${app.jobId.startupId.profilepic}`} className="rounded-lg w-full h-full object-cover" />
                         ) : (
                           <Building2 className="h-5 w-5" />
                         )}
@@ -367,7 +368,7 @@ export default function StudentDashboard() {
                   <CardContent className="p-5">
                     <div className="flex items-center gap-3 mb-3">
                       <div className="h-12 w-12 rounded-xl bg-accent/10 flex items-center justify-center font-bold text-accent uppercase">
-                        {startup.profilepic ? <img src={startup.profilepic} className="rounded-xl w-full h-full object-cover" /> : startup.startupName.substring(0,2)}
+                        {startup.profilepic ? <img src={`${BASE_URL}${startup.profilepic}`} className="rounded-xl w-full h-full object-cover" /> : startup.startupName.substring(0,2)}
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold truncate">{startup.startupName}</h3>

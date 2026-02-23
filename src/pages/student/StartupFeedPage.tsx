@@ -7,23 +7,30 @@ import {
   MoreHorizontal,
   Calendar,
   ExternalLink,
-  Send,
+  Edit,
   Trash2,
-  User,
   Search,
-  X
+  X,
+  Send
 } from "lucide-react";
+import { API_BASE_URL } from "@/lib/api";
+import { CreatePostModal } from "@/components/startup/CreatePostModal";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { StudentLayout } from "@/components/layouts/StudentLayout";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { apiFetch, getStoredUser } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
@@ -49,11 +56,14 @@ interface FeedPost {
   type: "update" | "event" | "promotion";
   company: string;
   companyLogo: string;
+  companyAvatar?: string;
   verified: boolean;
   postedAt: string;
   title: string;
   content: string;
   image?: string;
+  video?: string;
+  startupUserId?: string;
   link?: string;
   eventDate?: string;
   eventLocation?: string;
@@ -97,8 +107,13 @@ export default function StartupFeedPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const user = getStoredUser();
+  const BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 
   const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
+  
+  // Edit Post State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [postToEdit, setPostToEdit] = useState<FeedPost | null>(null);
   const [commentText, setCommentText] = useState("");
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
@@ -145,9 +160,12 @@ export default function StartupFeedPage() {
       type: postType,
       company: item.startupid?.startupName || "Startup",
       companyLogo: (item.startupid?.startupName || "S").charAt(0).toUpperCase(),
+      companyAvatar: item.startupid?.profilepic ? `${BASE_URL}${item.startupid.profilepic}` : undefined,
       verified: item.startupid?.verified || false,
       postedAt: formatTimeAgo(item.createdAt),
       title: item.title || "New Update",
+      video: item.media?.video || undefined,
+      startupUserId: item.startupid?.userId,
       content: item.description || "",
       image: item.media?.photo || undefined,
       link: item.link,
@@ -348,6 +366,31 @@ export default function StartupFeedPage() {
       toast({ title: "Error", description: "Could not delete comment", variant: "destructive" });
     }
   };
+  
+  const handleEdit = (post: FeedPost) => {
+    setPostToEdit(post);
+    setIsEditModalOpen(true);
+  };
+
+  const handleDelete = async (post: FeedPost) => {
+    if (!user?._id) return;
+    try {
+      const res = await apiFetch("/posts/delete-post/" + post.id, { method: "DELETE" });
+      if (res.status === 401) {
+        handleAuthError();
+        return;
+      }
+      if (res.success) {
+        setPosts(posts.filter(p => p.id !== post.id));
+        toast({ title: "Post deleted" });
+      } else {
+        throw new Error(res.error || "Failed to delete");
+      }
+    } catch (err) {
+       console.error(err);
+       toast({ title: "Error", description: "Could not delete post", variant: "destructive" });
+    }
+  };
 
   const filteredPosts = posts.filter((post) => {
     const query = searchQuery.toLowerCase();
@@ -394,9 +437,8 @@ export default function StartupFeedPage() {
           <div className="space-y-6">
             {loading ? (
               Array.from({ length: 3 }).map((_, i) => (
-                <Card key={i} className="overflow-hidden">
-                  <CardHeader className="pb-3"><div className="h-12 w-full bg-accent/10 animate-pulse rounded-lg" /></CardHeader>
-                  <CardContent><div className="h-24 bg-accent/5 animate-pulse rounded-lg" /></CardContent>
+                <Card key={i} className="animate-pulse">
+                  <CardContent className="h-48" />
                 </Card>
               ))
             ) : filteredPosts.length > 0 ? (
@@ -405,9 +447,12 @@ export default function StartupFeedPage() {
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="h-12 w-12 rounded-xl bg-accent/10 flex items-center justify-center font-bold text-accent text-xl flex-shrink-0 select-none">
-                          {post.companyLogo}
-                        </div>
+                        <Avatar className="h-12 w-12 rounded-xl">
+                          <AvatarImage src={post.companyAvatar} alt={post.company} className="object-cover" />
+                          <AvatarFallback className="bg-accent/10 text-accent text-xl font-bold">
+                            {post.companyLogo}
+                          </AvatarFallback>
+                        </Avatar>
                         <div>
                           <div className="flex items-center gap-2">
                             <h3 className="font-semibold">{post.company}</h3>
@@ -420,9 +465,23 @@ export default function StartupFeedPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         {getTypeBadge(post.type)}
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
+                        {user?._id === post.startupUserId && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEdit(post)}>
+                                <Edit className="mr-2 h-4 w-4" /> Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDelete(post)} className="text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" /> Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </div>
                     </div>
                   </CardHeader>
@@ -450,12 +509,24 @@ export default function StartupFeedPage() {
                     {post.image && (
                       <div className="rounded-lg overflow-hidden border bg-muted/20">
                         <img
-                          src={post.image}
+                          src={`${BASE_URL}${post.image}`}
                           alt={post.title}
                           className="w-full h-auto max-h-[400px] object-cover"
                           onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                         />
                       </div>
+                    )}
+                    
+                    {post.video && (
+                       <div className="rounded-lg overflow-hidden border bg-black aspect-video relative">
+                          <video 
+                             controls
+                             className="w-full h-full"
+                             src={`${BASE_URL}${post.video}`}
+                          >
+                             Your browser does not support the video tag.
+                          </video>
+                       </div>
                     )}
 
                     {post.link && (
@@ -609,6 +680,26 @@ export default function StartupFeedPage() {
           </DialogContent>
         </Dialog>
 
+      <CreatePostModal 
+        open={isEditModalOpen} 
+        onOpenChange={(open) => {
+          setIsEditModalOpen(open);
+          if (!open) setPostToEdit(null);
+        }}
+        onSuccess={() => {
+          // Refresh posts or update the local state
+          const fetchFeed = async () => {
+             // simplified refetch trigger logic
+             window.location.reload(); 
+          };
+          fetchFeed();
+        }}
+        initialData={postToEdit ? {
+          id: postToEdit.id,
+          title: postToEdit.title,
+          description: postToEdit.content
+        } : undefined}
+      />
       </div>
     </StudentLayout>
   );

@@ -14,6 +14,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { postService, Post } from "@/services/postService";
+import { API_BASE_URL } from "@/lib/api";
 import { StartupLayout } from "@/components/layouts/StartupLayout";
 import {
   Card,
@@ -37,6 +38,7 @@ export default function PostDetailPage() {
   const navigate = useNavigate();
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
+  const BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 
   useEffect(() => {
     const fetchPost = async () => {
@@ -136,7 +138,7 @@ export default function PostDetailPage() {
         {post.media?.photo && (
           <Card className="overflow-hidden">
             <img
-              src={post.media.photo}
+              src={`${BASE_URL}${post.media.photo}`}
               alt={post.title || "Post media"}
               className="w-full object-cover max-h-96"
             />

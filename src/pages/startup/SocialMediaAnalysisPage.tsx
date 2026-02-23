@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { postService, Post } from "@/services/postService";
 import { toast } from "@/hooks/use-toast";
+import { API_BASE_URL } from "@/lib/api";
 import {
   BarChart,
   Bar,
@@ -56,6 +57,7 @@ const TOOLTIP_STYLE = {
   borderRadius: "8px",
   fontSize: "12px",
 };
+const BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 
 function getPostType(post: Post): "photo" | "video" | "text" {
   if (post.media?.video) return "video";
@@ -412,7 +414,7 @@ export default function SocialMediaAnalysisPage() {
                           <div className="flex items-center gap-3">
                             {post.thumbnail && (
                               <img
-                                src={post.thumbnail}
+                                src={`${BASE_URL}${post.thumbnail}`}
                                 alt=""
                                 className="h-8 w-8 rounded object-cover shrink-0"
                               />
