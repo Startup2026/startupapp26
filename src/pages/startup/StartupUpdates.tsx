@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Mail,
   Calendar,
@@ -32,51 +32,35 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
+import { startupProfileService } from "@/services/startupProfileService";
+import { jobService } from "@/services/jobService";
+import { applicationService } from "@/services/applicationService";
+import { interviewService } from "@/services/interviewService";
 
 /* ---------------- TYPES ---------------- */
 
 type Status =
-  | "SELECTED"
+  | "HIRED"
   | "SHORTLISTED"
-  | "INTERVIEW_SCHEDULED";
+  | "INTERVIEW_SCHEDULED"
+  | "APPLIED"
+  | "REJECTED";
 
 interface Application {
-  id: string;
+  id: string; // Application ID
+  jobId: string;
+  studentId: string;
   name: string;
   email: string;
   jobTitle: string;
   status: Status;
 }
 
-/* ---------------- MOCK DATA ---------------- */
-
-const applications: Application[] = [
-  {
-    id: "1",
-    name: "Amit Sharma",
-    email: "amit@gmail.com",
-    jobTitle: "Frontend Developer",
-    status: "SELECTED",
-  },
-  {
-    id: "2",
-    name: "Neha Patil",
-    email: "neha@gmail.com",
-    jobTitle: "Backend Engineer",
-    status: "SELECTED",
-  },
-  {
-    id: "3",
-    name: "Rahul Verma",
-    email: "rahul@gmail.com",
-    jobTitle: "UI/UX Designer",
-    status: "SHORTLISTED",
-  },
-];
-
-/* ---------------- PAGE ---------------- */
-
 export default function StartupUpdates() {
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [startupId, setStartupId] = useState<string>("");
+
   /* ---------- Selected Candidates ---------- */
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [emailModal, setEmailModal] = useState(false);
@@ -84,11 +68,71 @@ export default function StartupUpdates() {
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
 
-  
+  /* ---------- Interview Schedule ---------- */
+  const [schedule, setSchedule] = useState({
+    applicationId: "",
+    date: "",
+    time: "",
+    mode: "Online",
+    link: "",
+    interviewer: "",
+    notes: "",
+  });
+
+  const [scheduling, setScheduling] = useState(false);
+
+  useEffect(() => {
+    const fetchApps = async () => {
+        try {
+            const profileRes = await startupProfileService.getMyProfile();
+            if(!profileRes.success || !profileRes.data) return;
+            setStartupId(profileRes.data._id);
+            const sId = profileRes.data._id;
+
+            const jobsRes = await jobService.getAllJobs();
+            if(!jobsRes.success || !jobsRes.data) return;
+            const myJobs = jobsRes.data.filter((j: any) => {
+                 const jSid = typeof j.startupId === 'object' ? j.startupId._id : j.startupId;
+                 return jSid === sId;
+            });
+
+            const appRes = await applicationService.getAllApplications();
+            if(appRes.success && appRes.data) {
+                const relevant = appRes.data.filter((a: any) => {
+                     const aJobId = typeof a.jobId === 'object' ? a.jobId._id : a.jobId;
+                     return myJobs.some((j: any) => j._id === aJobId);
+                });
+
+                setApplications(relevant.map((a: any) => {
+                    const student = a.studentId;
+                    const job = typeof a.jobId === 'object' ? a.jobId : myJobs.find((j: any) => j._id === a.jobId);
+                    return {
+                        id: a._id,
+                        jobId: job?._id,
+                        studentId: student?._id,
+                        name: student ? `${student.firstName} ${student.lastName}` : "Unknown",
+                        email: student?.email || "",
+                        jobTitle: job?.role || "Unknown",
+                        status: a.status as Status
+                    };
+                }));
+            }
+        } catch(e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    };
+    fetchApps();
+  }, []);
 
 
   const selectedCandidates = applications.filter(
-    (a) => a.status === "SELECTED"
+    (a) => a.status === "HIRED"
+  );
+
+  const shortlisted = applications.filter(
+    (a) => a.status === "SHORTLISTED"
   );
 
   const toggleSelect = (id: string) => {
@@ -102,7 +146,7 @@ export default function StartupUpdates() {
   const sendSelectionEmail = async () => {
     setSending(true);
 
-    // Simulated API delay
+    // Mock Email sending
     setTimeout(() => {
       setSending(false);
       setEmailModal(false);
@@ -114,37 +158,66 @@ export default function StartupUpdates() {
     }, 1500);
   };
 
-  /* ---------- Interview Schedule ---------- */
-  const [schedule, setSchedule] = useState({
-    applicationId: "",
-    date: "",
-    time: "",
-    mode: "Online",
-    link: "",
-    interviewer: "",
-    notes: "",
-  });
+  const scheduleInterview = async () => {
+    if(!schedule.applicationId) return;
+    
+    setScheduling(true);
+    try {
+        const app = applications.find(a => a.id === schedule.applicationId);
+        if(!app) throw new Error("Application not found");
 
-  const shortlisted = applications.filter(
-    (a) => a.status === "SHORTLISTED"
-  );
+        const dateTime = new Date(`${schedule.date}T${schedule.time}`);
 
-  const scheduleInterview = () => {
-    toast({
-      title: "Interview Scheduled",
-      description: "Interview email has been sent to the candidate.",
-    });
+        const payload = {
+            startupId,
+            jobId: app.jobId,
+            studentId: app.studentId,
+            date: schedule.date, // Backend expects string dates? Model uses String for date/time based on previous fix
+            time: schedule.time,
+            type: schedule.mode,
+            meetingLink: schedule.link,
+            interviewerName: schedule.interviewer,
+            notes: schedule.notes,
+            status: "Scheduled"
+        };
+        
+        const res = await interviewService.createInterview(payload);
+        if(res.success) {
+            // Also update application status?
+            await applicationService.updateApplication(app.id, { status: "INTERVIEW_SCHEDULED" });
+            
+            // Update local state
+            setApplications(prev => prev.map(a => a.id === app.id ? { ...a, status: "INTERVIEW_SCHEDULED" } : a));
 
-    setSchedule({
-      applicationId: "",
-      date: "",
-      time: "",
-      mode: "Online",
-      link: "",
-      interviewer: "",
-      notes: "",
-    });
+            toast({
+                title: "Interview Scheduled",
+                description: "Interview has been created successfully.",
+            });
+
+            setSchedule({
+                applicationId: "",
+                date: "",
+                time: "",
+                mode: "Online",
+                link: "",
+                interviewer: "",
+                notes: "",
+            });
+        }
+    } catch(e) {
+        toast({ title: "Error", description: "Failed to schedule interview", variant: "destructive" });
+    } finally {
+        setScheduling(false);
+    }
   };
+
+  if (loading) return (
+      <StartupLayout>
+          <div className="flex bg-background h-[calc(100vh-4rem)] items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+      </StartupLayout>
+  );
 
   return (
     <StartupLayout>
@@ -160,7 +233,7 @@ export default function StartupUpdates() {
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <CheckCircle className="h-6 w-6 text-accent" />
-              Selected Candidates
+              Hired Candidates
             </CardTitle>
 
             <Button
@@ -173,7 +246,8 @@ export default function StartupUpdates() {
           </CardHeader>
 
           <CardContent className="space-y-3">
-            {selectedCandidates.map((c) => (
+            {selectedCandidates.length === 0 ? <p className="text-muted-foreground">No hired candidates yet.</p> :
+            selectedCandidates.map((c) => (
               <div
                 key={c.id}
                 className="flex items-center justify-between border rounded-lg p-3"
@@ -190,7 +264,7 @@ export default function StartupUpdates() {
                     </p>
                   </div>
                 </div>
-                <Badge variant="accent">SELECTED</Badge>
+                <Badge className="bg-green-600">HIRED</Badge>
               </div>
             ))}
           </CardContent>
@@ -208,7 +282,7 @@ export default function StartupUpdates() {
           <CardContent className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
               <div>
-                <Label>Candidate</Label>
+                <Label>Candidate (Shortlisted only)</Label>
                 <Select
                   value={schedule.applicationId}
                   onValueChange={(v) =>
@@ -219,7 +293,8 @@ export default function StartupUpdates() {
                     <SelectValue placeholder="Select candidate" />
                   </SelectTrigger>
                   <SelectContent>
-                    {shortlisted.map((a) => (
+                    {shortlisted.length === 0 ? <SelectItem value="none" disabled>No shortlisted candidates</SelectItem> :
+                    shortlisted.map((a) => (
                       <SelectItem key={a.id} value={a.id}>
                         {a.name} — {a.jobTitle}
                       </SelectItem>
@@ -308,9 +383,9 @@ export default function StartupUpdates() {
             <Button
               className="w-full mt-4"
               onClick={scheduleInterview}
-              disabled={!schedule.applicationId}
+              disabled={!schedule.applicationId || scheduling}
             >
-              <Clock className="h-4 w-4 mr-2" />
+              {scheduling ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <Clock className="h-4 w-4 mr-2" />}
               Schedule Interview
             </Button>
           </CardContent>

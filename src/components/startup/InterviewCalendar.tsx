@@ -98,9 +98,8 @@ export function InterviewCalendar({ interviews, onInterviewClick }: InterviewCal
 
   // Get interviews for a specific day
   const getInterviewsForDay = (day: Date) => {
-    return filteredInterviews.filter((interview) =>
-      isSameDay(parseISO(interview.date), day)
-    );
+    const dateStr = format(day, "yyyy-MM-dd");
+    return filteredInterviews.filter((interview) => interview.date === dateStr);
   };
 
   // Navigation handlers

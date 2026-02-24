@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
   Search,
@@ -7,13 +7,14 @@ import {
   ExternalLink,
   BadgeCheck,
   Building2,
+  Loader2,
 } from "lucide-react";
 import { StudentLayout } from "@/components/layouts/StudentLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { apiFetch, getStoredUser } from "@/lib/api";
+import { apiFetch, getStoredUser, API_BASE_URL } from "@/lib/api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -34,37 +35,79 @@ interface Startup {
 
 export default function StartupDiscoveryPage() {
   const [startups, setStartups] = useState<Startup[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const user = getStoredUser();
+  const BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const observerTarget = useRef(null);
 
   // --- Fetch Recommendations ---
   useEffect(() => {
     const fetchStartups = async () => {
       setLoading(true);
       try {
-        let endpoint = "/recommendations/cold-start/startups?limit=20";
+        let endpoint = `/recommendations/cold-start/startups?limit=20&page=${page}`;
         if (user?._id) {
-          endpoint = `/recommendations/startups/${user._id}?limit=20&random=true`;
+          endpoint = `/recommendations/startups/${user._id}?limit=20&page=${page}&random=true`;
         }
 
         const res = await apiFetch(endpoint);
 
         if (res.success && Array.isArray(res.data)) {
           const transformedData = res.data.map((item: any) => transformStartup(item));
-          setStartups(transformedData);
+          
+          if (transformedData.length === 0) {
+             setHasMore(false);
+          } else {
+             setStartups(prev => {
+                const newStartups = page === 1 ? transformedData : [...prev, ...transformedData];
+                // Ensure uniqueness
+                const uniqueMap = new Map();
+                newStartups.forEach(s => uniqueMap.set(s.id, s));
+                return Array.from(uniqueMap.values());
+             });
+          }
         } else {
           console.error("Failed to load startups:", res.message);
+          setHasMore(false);
         }
       } catch (error) {
         console.error("Error fetching startups:", error);
       } finally {
         setLoading(false);
+        setIsInitialLoading(false);
       }
     };
 
     fetchStartups();
-  }, [user?._id]);
+  }, [page, user?._id]);
+
+  // Infinite Scroll Observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && hasMore && !loading) {
+          setPage(prev => prev + 1);
+        }
+      },
+      { threshold: 1.0 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => {
+      if (observerTarget.current) {
+        observer.unobserve(observerTarget.current);
+      }
+    };
+  }, [hasMore, loading]);
 
   // --- Transform Backend Data to UI Model ---
   const transformStartup = (item: any): Startup => {
@@ -84,7 +127,7 @@ export default function StartupDiscoveryPage() {
     return {
       id: item._id,
       name: item.startupName || "Startup",
-      logo: item.profilepic, 
+      logo: item.profilepic ? `${BASE_URL}${item.profilepic}` : "",
       domain: item.industry || "General",
       location: locationStr,
       tagline: item.tagline || "Building the future",
@@ -138,7 +181,7 @@ export default function StartupDiscoveryPage() {
 
         {/* Content */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {loading ? (
+          {isInitialLoading ? (
             Array.from({ length: 6 }).map((_, i) => (
               <Card key={i} className="flex flex-col h-[280px]">
                 <CardContent className="p-6">
@@ -155,7 +198,8 @@ export default function StartupDiscoveryPage() {
               </Card>
             ))
           ) : filteredStartups.length > 0 ? (
-            filteredStartups.map((startup) => (
+            <>  
+            {filteredStartups.map((startup) => (
               <Card key={startup.id} className="flex flex-col hover:shadow-md transition-all duration-200 border-border/60">
                 <CardContent className="p-6 flex-1 flex flex-col">
                   <div className="flex items-start justify-between mb-4">
@@ -222,8 +266,10 @@ export default function StartupDiscoveryPage() {
                   </div>
                 </CardContent>
               </Card>
-            ))
+            ))}
+            </>
           ) : (
+             !isInitialLoading && (
             <div className="col-span-full flex flex-col items-center justify-center p-12 text-center border-2 border-dashed rounded-lg bg-muted/50">
               <div className="h-12 w-12 rounded-full bg-background flex items-center justify-center mb-4 shadow-sm">
                 <Building2 className="h-66 w-6 text-muted-foreground" />
@@ -240,8 +286,21 @@ export default function StartupDiscoveryPage() {
                 Clear Search
               </Button>
             </div>
+             )
           )}
         </div>
+        
+        {/* Loaders/Observers */}
+        {loading && hasMore && (
+            <div className="flex justify-center p-6 w-full">
+                <Loader2 className="animate-spin h-6 w-6 text-primary" />
+            </div>
+        )}
+        
+        {!loading && hasMore && (
+            <div ref={observerTarget} className="h-4 w-full flex justify-center p-2">
+            </div>
+        )}
       </div>
     </StudentLayout>
   );

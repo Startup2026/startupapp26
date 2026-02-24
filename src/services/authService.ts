@@ -11,6 +11,7 @@ export interface User {
 export interface LoginResponse {
   user: User;
   token: string;
+  onboardingStep?: 'profile' | 'plan' | 'completed';
 }
 
 export interface RegisterData {
@@ -34,12 +35,19 @@ export const authService = {
     return result;
   },
 
-  async verifyEmail(email: string, token: string): Promise<{ success: boolean; error?: string }> {
+  async verifyEmail(email: string, token: string): Promise<{ success: boolean; data?: LoginResponse; error?: string }> {
     // Calls universal verification endpoint using email + otp token
-    return apiFetch(`/auth/verify-email`, {
+    const result = await apiFetch<LoginResponse>(`/auth/verify-email`, {
       method: 'POST',
       body: JSON.stringify({ email, token }),
     });
+
+    if (result.success && result.data) {
+      setAuthToken(result.data.token);
+      setStoredUser(result.data.user);
+    }
+
+    return result;
   },
 
   async resendVerification(email: string): Promise<{ success: boolean; error?: string; status?: number }> {

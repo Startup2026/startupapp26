@@ -23,8 +23,10 @@ import {
 } from "lucide-react";
 import { apiFetch, getStoredUser } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSocket } from "@/contexts/SocketContext";
+import { useToast } from "@/hooks/use-toast";
 
-type ApplicationStatus = "applied" | "shortlisted" | "rejected" | "all";
+type ApplicationStatus = "applied" | "shortlisted" | "rejected" | "selected" | "interview" | "all";
 
 interface Application {
   _id: string;
@@ -42,6 +44,7 @@ interface Application {
   studentId: string;
   atsScore: number;
   status: string; // "APPLIED", "SHORTLISTED", "REJECTED"
+  statusVisible?: boolean; // New field from backend
   createdAt: string;
 }
 
@@ -56,6 +59,16 @@ const statusConfig: any = {
     color: "bg-accent/10 text-accent border-accent/20",
     icon: CheckCircle2,
   },
+  interview: {
+    label: "Interview",
+    color: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+    icon: Calendar,
+  },
+  selected: {
+    label: "Selected",
+    color: "bg-green-500/10 text-green-400 border-green-500/20",
+    icon: CheckCircle2,
+  },
   rejected: {
     label: "Rejected",
     color: "bg-destructive/10 text-destructive border-destructive/20",
@@ -68,6 +81,34 @@ export default function ApplicationsPage() {
   const [statusFilter, setStatusFilter] = useState<ApplicationStatus>("all");
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
+  const { socket } = useSocket();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!socket) return;
+
+    // Listen for application status updates
+    const handleStatusUpdate = (data: { applicationId: string, status: string, jobRole?: string, company?: string }) => {
+        console.log("Status update received:", data);
+        setApplications(prev => prev.map(app => {
+            if (app._id === data.applicationId) {
+                return { ...app, status: data.status };
+            }
+            return app;
+        }));
+
+        toast({
+            title: "Application Updated",
+            description: `Your application for ${data.jobRole || 'a job'} at ${data.company || 'a company'} has been updated to ${data.status}.`,
+        });
+    };
+
+    socket.on("applicationStatusUpdated", handleStatusUpdate);
+
+    return () => {
+        socket.off("applicationStatusUpdated", handleStatusUpdate);
+    };
+  }, [socket, toast]);
 
   useEffect(() => {
     const fetchApplications = async () => {
@@ -93,8 +134,15 @@ export default function ApplicationsPage() {
     const jobTitle = app?.jobId?.role || "Unknown Role";
     const company = app?.jobId?.startupId?.startupName || "Unknown Company";
     
+    // Check visibility logic: If status is not visible to student, show as 'applied'
+    // We check statusVisible (explicit flag) OR fallback to isNotified (if present) OR if actual status is APPLIED
+    const isVisible = app.statusVisible || (app as any).isNotified || app.status === "APPLIED";
+    const effectiveStatus = isVisible ? app.status : "APPLIED";
+
     // Normalize status from backend (UPPERCASE) to frontend (lowercase) for filtering
-    const appStatus = app.status ? app.status.toLowerCase() : "applied";
+    let appStatus = effectiveStatus ? effectiveStatus.toLowerCase() : "applied";
+    if (effectiveStatus?.toUpperCase() === "INTERVIEW_SCHEDULED") appStatus = "interview";
+    if (effectiveStatus?.toUpperCase() === "SELECTED" || effectiveStatus?.toUpperCase() === "HIRED") appStatus = "selected";
 
     const matchesSearch =
       jobTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -105,13 +153,39 @@ export default function ApplicationsPage() {
     return matchesSearch && matchesStatus;
   });
 
-  const getStatusKey = (status: string) => status ? status.toLowerCase() : "applied";
+  const getStatusKey = (status: string, isVisible: boolean = true) => {
+    // If not visible and not 'APPLIED', force to 'applied' key
+    if (!isVisible && status !== "APPLIED") return "applied";
+    
+    if (!status) return "applied";
+    if (status.toUpperCase() === "INTERVIEW_SCHEDULED") return "interview";
+    if (status.toUpperCase() === "SELECTED" || status.toUpperCase() === "HIRED") return "selected";
+    return status.toLowerCase();
+  };
 
   const statusCounts = {
     all: applications.length,
-    applied: applications.filter((a) => a.status === "APPLIED").length,
-    shortlisted: applications.filter((a) => a.status === "SHORTLISTED").length,
-    rejected: applications.filter((a) => a.status === "REJECTED").length,
+    applied: applications.filter((a) => {
+      const isVisible = a.statusVisible || (a as any).isNotified || a.status === "APPLIED";
+      const status = isVisible ? a.status : "APPLIED";
+      return !status || status.toUpperCase() === "APPLIED";
+    }).length,
+    shortlisted: applications.filter((a) => {
+       const isVisible = a.statusVisible || (a as any).isNotified || a.status === "APPLIED";
+       return isVisible && a.status && a.status.toUpperCase() === "SHORTLISTED";
+    }).length,
+    interview: applications.filter((a) => {
+       const isVisible = a.statusVisible || (a as any).isNotified || a.status === "APPLIED";
+       return isVisible && a.status && a.status.toUpperCase() === "INTERVIEW_SCHEDULED";
+    }).length,
+    selected: applications.filter((a) => {
+       const isVisible = a.statusVisible || (a as any).isNotified || a.status === "APPLIED";
+       return isVisible && a.status && ["SELECTED", "HIRED"].includes(a.status.toUpperCase());
+    }).length,
+    rejected: applications.filter((a) => {
+       const isVisible = a.statusVisible || (a as any).isNotified || a.status === "APPLIED";
+       return isVisible && a.status && a.status.toUpperCase() === "REJECTED";
+    }).length,
   };
 
   return (
@@ -129,7 +203,7 @@ export default function ApplicationsPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {(["all", "applied", "shortlisted", "rejected"] as const).map((status) => {
+          {(["all", "applied", "shortlisted", "interview", "selected", "rejected"] as const).map((status) => {
             const isActive = statusFilter === status;
             const config = status === "all" ? null : statusConfig[status];
             
@@ -154,7 +228,10 @@ export default function ApplicationsPage() {
                     {config ? (
                       <config.icon className={`h-8 w-8 ${
                         status === "applied" ? "text-blue-400" :
-                        status === "shortlisted" ? "text-accent" : "text-destructive"
+                        status === "shortlisted" ? "text-accent" : 
+                        status === "selected" ? "text-green-400" :
+                        status === "interview" ? "text-purple-400" :
+                        "text-destructive"
                       }`} />
                     ) : (
                       <FileText className="h-8 w-8 text-muted-foreground" />
@@ -190,6 +267,8 @@ export default function ApplicationsPage() {
                   <SelectItem value="all">All Applications</SelectItem>
                   <SelectItem value="applied">Applied</SelectItem>
                   <SelectItem value="shortlisted">Shortlisted</SelectItem>
+                  <SelectItem value="interview">Interview</SelectItem>
+                  <SelectItem value="selected">Selected</SelectItem>
                   <SelectItem value="rejected">Rejected</SelectItem>
                 </SelectContent>
               </Select>
@@ -207,7 +286,9 @@ export default function ApplicationsPage() {
             </div>
           ) : (
             filteredApplications.map((app) => {
-              const statusKey = getStatusKey(app.status);
+              const isStatusVisible = app.statusVisible || (app as any).isNotified || app.status === "APPLIED";
+              const effectiveStatus = isStatusVisible ? app.status : "APPLIED";
+              const statusKey = getStatusKey(effectiveStatus, true); // effectiveStatus is already filtered, pass true
               const config = statusConfig[statusKey] || statusConfig['applied'];
               
               return (
@@ -244,6 +325,18 @@ export default function ApplicationsPage() {
                           {config.label}
                         </div>
                       </Badge>
+                      {app.resumeUrl && (
+                        <Button variant="link" size="sm" className="h-auto p-0 text-accent" asChild>
+                          <a 
+                            href={app.resumeUrl.startsWith('http') ? app.resumeUrl : `http://localhost:3000${app.resumeUrl}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                          >
+                            <FileText className="h-3 w-3 mr-1" />
+                            View Applied Resume
+                          </a>
+                        </Button>
+                      )}
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Calendar className="h-3 w-3" />
                         <span>Applied on {new Date(app.createdAt).toLocaleDateString()}</span>

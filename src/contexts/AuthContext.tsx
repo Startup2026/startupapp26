@@ -6,8 +6,9 @@ import { getStoredUser, clearAuthToken } from '@/lib/api';
 
 type AuthContextValue = {
     user: User | null;
-    login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+    login: (email: string, password: string) => Promise<{ success: boolean; onboardingStep?: string; error?: string }>;
     register: (username: string, email: string, password: string, role: 'student' | 'startup' | 'admin') => Promise<{ success: boolean; error?: string }>;
+    verifyEmail: (email: string, token: string) => Promise<{ success: boolean; onboardingStep?: string; error?: string }>;
     logout: () => Promise<void>;
     resendVerification: (email: string) => Promise<{ success: boolean; error?: string }>; 
 };
@@ -33,7 +34,10 @@ export const AuthProvider: React.FC<any> = ({ children }) => {
         const result = await authService.login(email, password);
         if (result.success && result.data) {
             setUser(result.data.user);
-            return { success: true };
+            return { 
+                success: true, 
+                onboardingStep: result.data.onboardingStep 
+            };
         }
 
         // Generic error message for security, but pass through verify message if present
@@ -43,7 +47,7 @@ export const AuthProvider: React.FC<any> = ({ children }) => {
 
     const register = async (username: string, email: string, password: string, role: 'student' | 'startup' | 'admin') => {
         const result = await authService.register({ username, email, password, role });
-        if (result.success && result.data) {
+        if (result.success) {
             // Do NOT auto-login; require email verification
             return { success: true };
         }
@@ -62,8 +66,20 @@ export const AuthProvider: React.FC<any> = ({ children }) => {
         return { success: false, error: result.error || 'Unable to resend verification' };
     };
 
+    const verifyEmail = async (email: string, token: string) => {
+        const result = await authService.verifyEmail(email, token);
+        if (result.success && result.data) {
+            setUser(result.data.user);
+            return { 
+                success: true, 
+                onboardingStep: result.data.onboardingStep 
+            };
+        }
+        return { success: false, error: result.error || 'Verification failed' };
+    };
+
     return (
-        <AuthContext.Provider value={{ user, login, register, logout, resendVerification }}>
+        <AuthContext.Provider value={{ user, login, register, verifyEmail, logout, resendVerification }}>
             {children}
         </AuthContext.Provider>
     );

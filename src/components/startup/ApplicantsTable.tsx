@@ -30,7 +30,6 @@ import {
   Search,
   FileText,
   Mail,
-  Calendar,
   CheckCircle,
   XCircle,
   ArrowUpDown,
@@ -60,7 +59,6 @@ interface ApplicantsTableProps {
   onSelectChange: (ids: string[]) => void;
   onStatusChange: (id: string, status: ApplicationStatus) => void;
   onViewDetails: (applicant: Applicant) => void;
-  onScheduleInterview: (applicant: Applicant) => void;
   onSendEmail: (applicant: Applicant) => void;
 }
 
@@ -74,7 +72,6 @@ export function ApplicantsTable({
   onSelectChange,
   onStatusChange,
   onViewDetails,
-  onScheduleInterview,
   onSendEmail,
 }: ApplicantsTableProps) {
   const [search, setSearch] = useState("");
@@ -246,7 +243,11 @@ export function ApplicantsTable({
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     {applicant.resumeUrl ? (
                       <Button variant="ghost" size="sm" asChild className="h-8 gap-1">
-                        <a href={applicant.resumeUrl} target="_blank" rel="noopener noreferrer">
+                        <a 
+                          href={applicant.resumeUrl.startsWith('http') ? applicant.resumeUrl : `http://localhost:3000${applicant.resumeUrl}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                        >
                           <FileText className="h-4 w-4" />
                           <ExternalLink className="h-3 w-3" />
                         </a>
@@ -291,10 +292,6 @@ export function ApplicantsTable({
                         <DropdownMenuItem onClick={() => onSendEmail(applicant)}>
                           <Mail className="h-4 w-4 mr-2" />
                           Send Email
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onScheduleInterview(applicant)}>
-                          <Calendar className="h-4 w-4 mr-2" />
-                          Schedule Interview
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem

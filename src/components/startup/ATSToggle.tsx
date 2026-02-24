@@ -21,11 +21,11 @@ export function ATSToggle({ enabled, onToggle, className }: ATSToggleProps) {
         </div>
         <div className="flex flex-col">
           <Label className="text-sm font-medium">
-            {enabled ? "ATS Automation Enabled" : "Manual Shortlisting Mode"}
+            {enabled ? "Automated Scoring Enabled" : "Manual Shortlisting Mode"}
           </Label>
           <p className="text-xs text-muted-foreground">
             {enabled 
-              ? "AI-powered scoring and automated ranking active" 
+              ? "Keyword-based mathematical ranking active" 
               : "Review and shortlist candidates manually"}
           </p>
         </div>

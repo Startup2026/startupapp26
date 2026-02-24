@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { SocketProvider } from "@/contexts/SocketContext";
 import Index from "./pages/Index";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -16,11 +17,13 @@ import ApplicationsPage from "./pages/student/ApplicationsPage";
 import NotificationsPage from "./pages/student/NotificationsPage";
 import StartupDiscoveryPage from "./pages/student/StartupDiscoveryPage";
 import StudentProfilePage from "./pages/student/StudentProfilePage";
+import StudentSettingsPage from "./pages/student/StudentSettingsPage";
 import CreateStudentProfilePage from "./pages/student/CreateStudentProfilePage";
 import StartupFeedPage from "./pages/student/StartupFeedPage";
 import StartupProfilePage from "./pages/student/StartupProfilePage";
 import StartupDashboard from "./pages/startup/StartupDashboard";
 import CreateStartupProfilePage from "./pages/startup/CreateStartupProfilePage";
+import SelectPlanPage from "./pages/startup/SelectPlanPage";
 import AdminStartupsPage from "./pages/admin/AdminStartupsPage";
 import AdminUsersPage from "./pages/admin/AdminUsersPage";
 import AdminModerationPage from "./pages/admin/AdminModerationPage";
@@ -34,8 +37,11 @@ import Shortlisted from "./pages/startup/Shortlisted";
 import Selected from "./pages/startup/Selected";
 import InterviewCalendarPage from "./pages/startup/InterviewCalendarPage";
 import JobAnalysisPage from "./pages/startup/JobAnalysisPage";
+import AdvancedAnalysisPage from "./pages/startup/AdvancedAnalysisPage";
+import StartupSettingsPage from "./pages/startup/StartupSettingsPage";
 import SocialMediaAnalysisPage from "./pages/startup/SocialMediaAnalysisPage";
 import PostDetailPage from "./pages/startup/PostDetailPage";
+import StartupNotificationsPage from "./pages/startup/StartupNotificationsPage";
 import TrendingJobsPage from "./pages/student/TrendingJobsPost";
 import SavedItemsPage from "./pages/student/SavePage";
 const queryClient = new QueryClient();
@@ -43,10 +49,11 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
+      <SocketProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<LoginPage />} />
@@ -64,21 +71,26 @@ const App = () => (
             <Route path="/student/applications" element={<ApplicationsPage />} />
             <Route path="/student/notifications" element={<NotificationsPage />} />
             <Route path="/student/profile" element={<StudentProfilePage />} />
+            <Route path="/student/settings" element={<StudentSettingsPage />} />
             <Route path="/student/feed" element={<StartupFeedPage />} />
             <Route path="/student/TrendingJobs" element={<TrendingJobsPage />} />
             <Route path="/student/saved" element={<SavedItemsPage />} />
             {/* Startup routes */}
             <Route path="/startup/create-profile" element={<CreateStartupProfilePage />} />
+            <Route path="/startup/select-plan" element={<SelectPlanPage />} />
             <Route path="/startup/dashboard" element={<StartupDashboard />} />
             <Route path="/startup/jobs" element={<StartupJobsPage />} />
             <Route path="/startup/jobs/:jobId/applications" element={<JobApplicationsPage />} />
             <Route path="/startup/analysis" element={<JobAnalysisPage />} />
+            <Route path="/startup/advanced-analysis" element={<AdvancedAnalysisPage />} />
             <Route path="/startup/social-media-analysis" element={<SocialMediaAnalysisPage />} />
             <Route path="/startup/posts/:postId" element={<PostDetailPage />} />
             <Route path="/startup/interviews" element={<InterviewCalendarPage />} />
             <Route path="/startup/profile" element={<StartupProfile />} />
             <Route path="/startup/shortlisted" element={<Shortlisted />} />
             <Route path="/startup/selected" element={<Selected />} />
+            <Route path="/startup/notifications" element={<StartupNotificationsPage />} />
+            <Route path="/startup/settings" element={<StartupSettingsPage />} />
             
             {/* Admin routes */}
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
@@ -89,10 +101,9 @@ const App = () => (
             
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </SocketProvider>
     </AuthProvider>
   </QueryClientProvider>
-);
-
-export default App;
+);export default App;

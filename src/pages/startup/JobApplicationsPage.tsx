@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { StartupLayout } from "@/components/layouts/StartupLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,6 @@ import { ATSToggle } from "@/components/startup/ATSToggle";
 import { ApplicantsTable, Applicant } from "@/components/startup/ApplicantsTable";
 import { ManualShortlistingPanel } from "@/components/startup/ManualShortlistingPanel";
 import { BulkEmailModal } from "@/components/startup/BulkEmailModal";
-import { InterviewScheduleModal } from "@/components/startup/InterviewScheduleModal";
 import { ApplicationStatus } from "@/components/startup/StatusBadge";
 import {
   Dialog,
@@ -22,7 +21,6 @@ import {
   ArrowLeft,
   Users,
   Mail,
-  Calendar,
   Bot,
   Hand,
   Briefcase,
@@ -32,97 +30,115 @@ import {
   ExternalLink,
   CheckCircle,
   XCircle,
+  Loader2
 } from "lucide-react";
 import { StatusBadge } from "@/components/startup/StatusBadge";
-
-// Mock data for applications
-const mockApplicants: Applicant[] = [
-  {
-    id: "1",
-    name: "Amit Sharma",
-    email: "amit@gmail.com",
-    jobTitle: "Frontend Developer",
-    resumeUrl: "/resume/amit.pdf",
-    appliedAt: "12 Jan 2026",
-    status: "APPLIED",
-    atsScore: 85,
-    skills: ["React", "TypeScript", "Tailwind"],
-    experience: 2,
-    education: "B.E. Computer Engineering",
-  },
-  {
-    id: "2",
-    name: "Neha Patil",
-    email: "neha@gmail.com",
-    jobTitle: "Frontend Developer",
-    resumeUrl: "/resume/neha.pdf",
-    appliedAt: "13 Jan 2026",
-    status: "SHORTLISTED",
-    atsScore: 92,
-    skills: ["React", "Node.js", "MongoDB"],
-    experience: 3,
-    education: "B.Tech IT",
-  },
-  {
-    id: "3",
-    name: "Rahul Verma",
-    email: "rahul@gmail.com",
-    jobTitle: "Frontend Developer",
-    resumeUrl: "/resume/rahul.pdf",
-    appliedAt: "14 Jan 2026",
-    status: "APPLIED",
-    atsScore: 72,
-    skills: ["JavaScript", "CSS", "HTML"],
-    experience: 1,
-    education: "BCA",
-  },
-  {
-    id: "4",
-    name: "Priya Kulkarni",
-    email: "priya@gmail.com",
-    jobTitle: "Frontend Developer",
-    resumeUrl: "/resume/priya.pdf",
-    appliedAt: "15 Jan 2026",
-    status: "INTERVIEW_SCHEDULED",
-    atsScore: 88,
-    skills: ["React", "Vue", "Angular"],
-    experience: 4,
-    education: "M.Tech Computer Science",
-  },
-  {
-    id: "5",
-    name: "Vikram Singh",
-    email: "vikram@gmail.com",
-    jobTitle: "Frontend Developer",
-    resumeUrl: null,
-    appliedAt: "16 Jan 2026",
-    status: "REJECTED",
-    atsScore: 45,
-    skills: ["HTML", "CSS"],
-    experience: 0,
-    education: "BSc IT",
-  },
-];
+import { applicationService, Application } from "@/services/applicationService";
+import { jobService, Job } from "@/services/jobService";
+import { format } from "date-fns";
 
 export default function JobApplicationsPage() {
   const { jobId } = useParams();
   const [atsEnabled, setAtsEnabled] = useState(true);
-  const [applicants, setApplicants] = useState<Applicant[]>(mockApplicants);
+  const [applicants, setApplicants] = useState<Applicant[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [jobDetails, setJobDetails] = useState<Job | null>(null);
+  
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedApplicant, setSelectedApplicant] = useState<Applicant | null>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [emailModalOpen, setEmailModalOpen] = useState(false);
-  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
-  const [preselectedForSchedule, setPreselectedForSchedule] = useState<string | undefined>();
 
-  const handleStatusChange = (id: string, status: ApplicationStatus, notes?: string) => {
+  // Fetch Data
+  const fetchData = async () => {
+      try {
+          if (!jobId) return;
+          setLoading(true);
+
+          // Fetch Job Details
+          // Note: jobService.getJobById might return single job
+          const jobRes = await jobService.getJobById(jobId);
+          if (jobRes.success && jobRes.data) {
+              setJobDetails(jobRes.data);
+          }
+
+          // Fetch Applications
+          const appRes = await applicationService.getAllApplications();
+          if (appRes.success && appRes.data) {
+              const filteredApps = appRes.data.filter(app => {
+                  const appId = typeof app.jobId === 'object' ? app.jobId._id : app.jobId;
+                  return appId === jobId;
+              });
+
+              // Map to Applicant Interface
+              const mappedApplicants: Applicant[] = filteredApps.map(app => {
+                  // Safely access nested student info
+                  const student = app.studentId as any; 
+                  // If studentId is not populated (string), we have incomplete data. Handle gracefully.
+                  // Fix: access firstName (camelCase) to match backend model
+                  const fname = student?.firstName || student?.firstname;
+                  const lname = student?.lastName || student?.lastname;
+                  const name = fname ? `${fname} ${lname}` : "Unknown Student";
+                  const email = student?.email || "No Email";
+                  
+                  // Resume fallback: Application specific > Student Profile > null
+                  const resumeUrl = app.resumeUrl || student?.resumeUrl || null;
+                  
+                  return {
+                      id: app._id,
+                      name: name,
+                      email: email,
+                      jobTitle: (jobRes.success && jobRes.data) ? jobRes.data.role : "Job Role", // Use local data
+                      resumeUrl: resumeUrl,
+                      appliedAt: format(new Date(app.createdAt), "dd MMM yyyy"),
+                      status: app.status as ApplicationStatus, // Ensure backend status matches UI enum or map it
+                      atsScore: app.atsScore,
+                      skills: student?.skills || [], 
+                      experience: student?.experience?.length || 0, // Using count of exp entries as "years" approximation if not stored
+                      education: student?.education?.[0]?.degree || "N/A"
+                  };
+              });
+
+              setApplicants(mappedApplicants);
+          }
+      } catch (error) {
+          console.error("Error loading applications:", error);
+          toast({ title: "Error", description: "Failed to load data.", variant: "destructive" });
+      } finally {
+          setLoading(false);
+      }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [jobId]); 
+
+  // Update effect to refresh when jobDetails changes (to fix jobTitle in list if fetched later)
+  useEffect(() => {
+     if(jobDetails && applicants.length > 0 && applicants[0].jobTitle !== jobDetails.role) {
+         setApplicants(prev => prev.map(a => ({...a, jobTitle: jobDetails.role})));
+     }
+  }, [jobDetails]);
+
+
+  const handleStatusChange = async (id: string, status: ApplicationStatus, notes?: string) => {
+    // Optimistic Update
     setApplicants((prev) =>
       prev.map((a) => (a.id === id ? { ...a, status } : a))
     );
-    toast({
-      title: "Status Updated",
-      description: `Application status changed to ${status.toLowerCase().replace("_", " ")}.`,
-    });
+
+    const res = await applicationService.updateApplication(id, { status });
+    
+    if (res.success) {
+        toast({
+            title: "Status Updated",
+            description: `Application status changed to ${status.toLowerCase().replace("_", " ")}.`,
+        });
+    } else {
+        // Revert
+        fetchData();
+        toast({ title: "Error", description: "Failed to update status", variant: "destructive" });
+    }
   };
 
   const handleViewDetails = (applicant: Applicant) => {
@@ -130,10 +146,6 @@ export default function JobApplicationsPage() {
     setDetailsModalOpen(true);
   };
 
-  const handleScheduleInterview = (applicant: Applicant) => {
-    setPreselectedForSchedule(applicant.id);
-    setScheduleModalOpen(true);
-  };
 
   const handleSendEmail = (applicant: Applicant) => {
     setSelectedIds([applicant.id]);
@@ -144,8 +156,8 @@ export default function JobApplicationsPage() {
     total: applicants.length,
     applied: applicants.filter((a) => a.status === "APPLIED").length,
     shortlisted: applicants.filter((a) => a.status === "SHORTLISTED").length,
-    interview: applicants.filter((a) => a.status === "INTERVIEW_SCHEDULED").length,
-    selected: applicants.filter((a) => a.status === "SELECTED").length,
+    interview: applicants.filter((a) => a.status === "INTERVIEW_SCHEDULED").length, // Backend doesn't support this yet -> map to supported
+    selected: applicants.filter((a) => a.status === "HIRED" || a.status === "SELECTED").length,
     rejected: applicants.filter((a) => a.status === "REJECTED").length,
   };
 
@@ -157,15 +169,16 @@ export default function JobApplicationsPage() {
     jobTitle: a.jobTitle,
   }));
 
-  const scheduleCandidates = applicants
-    .filter((a) => a.status === "SHORTLISTED" || a.status === "APPLIED")
-    .map((a) => ({
-      id: a.id,
-      name: a.name,
-      email: a.email,
-      status: a.status,
-      jobTitle: a.jobTitle,
-    }));
+
+  if (loading) {
+      return (
+          <StartupLayout>
+              <div className="flex bg-background h-[calc(100vh-4rem)] items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+          </StartupLayout>
+      )
+  }
 
   return (
     <StartupLayout>
@@ -184,7 +197,7 @@ export default function JobApplicationsPage() {
                 Applications
               </h1>
               <p className="text-muted-foreground text-sm">
-                Frontend Developer • Job ID: {jobId || "101"}
+                {jobDetails ? jobDetails.role : "Loading Job..."}
               </p>
             </div>
           </div>
@@ -200,21 +213,11 @@ export default function JobApplicationsPage() {
               <Mail className="h-4 w-4 mr-2" />
               Bulk Email
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setPreselectedForSchedule(undefined);
-                setScheduleModalOpen(true);
-              }}
-            >
-              <Calendar className="h-4 w-4 mr-2" />
-              Schedule Interviews
-            </Button>
           </div>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <Card className="p-4">
             <p className="text-sm text-muted-foreground">Total</p>
             <p className="text-2xl font-bold">{stats.total}</p>
@@ -227,12 +230,13 @@ export default function JobApplicationsPage() {
             <p className="text-sm text-muted-foreground">Shortlisted</p>
             <p className="text-2xl font-bold text-accent">{stats.shortlisted}</p>
           </Card>
-          <Card className="p-4">
+          {/* Interview column commented out if not supported by backend yet, or mapped to SHORTLISTED */}
+          {/* <Card className="p-4">
             <p className="text-sm text-muted-foreground">Interview</p>
             <p className="text-2xl font-bold text-warning">{stats.interview}</p>
-          </Card>
+          </Card> */}
           <Card className="p-4">
-            <p className="text-sm text-muted-foreground">Accepted</p>
+            <p className="text-sm text-muted-foreground">Selected</p>
             <p className="text-2xl font-bold text-success">{stats.selected}</p>
           </Card>
           <Card className="p-4">
@@ -265,7 +269,6 @@ export default function JobApplicationsPage() {
               onSelectChange={setSelectedIds}
               onStatusChange={handleStatusChange}
               onViewDetails={handleViewDetails}
-              onScheduleInterview={handleScheduleInterview}
               onSendEmail={handleSendEmail}
             />
           </TabsContent>
@@ -274,7 +277,6 @@ export default function JobApplicationsPage() {
             <ManualShortlistingPanel
               applicants={applicants}
               onStatusChange={handleStatusChange}
-              onScheduleInterview={handleScheduleInterview}
               onSendEmail={handleSendEmail}
             />
           </TabsContent>
@@ -350,7 +352,11 @@ export default function JobApplicationsPage() {
                 <div className="flex flex-wrap gap-3 pt-4 border-t">
                   {selectedApplicant.resumeUrl && (
                     <Button variant="outline" asChild>
-                      <a href={selectedApplicant.resumeUrl} target="_blank" rel="noopener noreferrer">
+                      <a 
+                        href={selectedApplicant.resumeUrl.startsWith('http') ? selectedApplicant.resumeUrl : `http://localhost:3000${selectedApplicant.resumeUrl}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                      >
                         <FileText className="h-4 w-4 mr-2" />
                         View Resume
                         <ExternalLink className="h-3 w-3 ml-1" />
@@ -361,14 +367,10 @@ export default function JobApplicationsPage() {
                     <Mail className="h-4 w-4 mr-2" />
                     Send Email
                   </Button>
-                  <Button variant="outline" onClick={() => handleScheduleInterview(selectedApplicant)}>
-                    <Calendar className="h-4 w-4 mr-2" />
-                    Schedule Interview
-                  </Button>
                   <Button
                     className="bg-success text-success-foreground hover:bg-success/90"
                     onClick={() => {
-                      handleStatusChange(selectedApplicant.id, "SELECTED");
+                      handleStatusChange(selectedApplicant.id, "HIRED" as ApplicationStatus);
                       setDetailsModalOpen(false);
                     }}
                   >
@@ -401,14 +403,8 @@ export default function JobApplicationsPage() {
           preselectedIds={selectedIds}
         />
 
-        {/* Interview Schedule Modal */}
-        <InterviewScheduleModal
-          open={scheduleModalOpen}
-          onOpenChange={setScheduleModalOpen}
-          candidates={scheduleCandidates}
-          preselectedId={preselectedForSchedule}
-        />
       </div>
     </StartupLayout>
   );
 }
+

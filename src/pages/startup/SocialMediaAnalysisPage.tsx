@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Heart,
@@ -9,7 +9,11 @@ import {
   Video,
   CalendarDays,
   BarChart3,
+  Loader2,
 } from "lucide-react";
+import { postService, Post } from "@/services/postService";
+import { toast } from "@/hooks/use-toast";
+import { API_BASE_URL } from "@/lib/api";
 import {
   BarChart,
   Bar,
@@ -41,83 +45,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-/* -------------------- MOCK DATA (matches post schema) -------------------- */
-
-const mockPosts = [
-  {
-    _id: "1",
-    title: "Excited to announce our Series A!",
-    description: "We just closed our Series A funding round...",
-    media: { photo: "https://picsum.photos/seed/post1/400/300" },
-    likes: Array(124).fill("userId"),
-    comments: Array(38).fill({ user: "userId", text: "Congrats!", createdAt: new Date() }),
-    createdAt: "2026-02-08T10:00:00Z",
-  },
-  {
-    _id: "2",
-    title: "Behind the scenes of our product sprint",
-    description: "Take a look at how our engineering team works...",
-    media: { video: "https://example.com/video.mp4" },
-    likes: Array(98).fill("userId"),
-    comments: Array(27).fill({ user: "userId", text: "Great!", createdAt: new Date() }),
-    createdAt: "2026-02-05T14:30:00Z",
-  },
-  {
-    _id: "3",
-    title: "Meet our new CTO",
-    description: "We're thrilled to welcome...",
-    media: { photo: "https://picsum.photos/seed/post3/400/300" },
-    likes: Array(210).fill("userId"),
-    comments: Array(56).fill({ user: "userId", text: "Welcome!", createdAt: new Date() }),
-    createdAt: "2026-02-01T09:00:00Z",
-  },
-  {
-    _id: "4",
-    title: "Our journey to 10k users",
-    description: "A milestone we're proud of...",
-    media: { photo: "https://picsum.photos/seed/post4/400/300" },
-    likes: Array(175).fill("userId"),
-    comments: Array(44).fill({ user: "userId", text: "Amazing!", createdAt: new Date() }),
-    createdAt: "2026-01-28T11:00:00Z",
-  },
-  {
-    _id: "5",
-    title: "Team offsite recap",
-    description: "What a week it has been...",
-    media: { video: "https://example.com/video2.mp4" },
-    likes: Array(67).fill("userId"),
-    comments: Array(19).fill({ user: "userId", text: "Love it!", createdAt: new Date() }),
-    createdAt: "2026-01-20T16:00:00Z",
-  },
-  {
-    _id: "6",
-    title: "Product update: Dark mode is here",
-    description: "We listened to your feedback...",
-    media: { photo: "https://picsum.photos/seed/post6/400/300" },
-    likes: Array(156).fill("userId"),
-    comments: Array(62).fill({ user: "userId", text: "Finally!", createdAt: new Date() }),
-    createdAt: "2026-01-15T08:00:00Z",
-  },
-  {
-    _id: "7",
-    title: "Why we chose React Native",
-    description: "A deep dive into our tech stack decisions...",
-    media: {},
-    likes: Array(89).fill("userId"),
-    comments: Array(31).fill({ user: "userId", text: "Interesting!", createdAt: new Date() }),
-    createdAt: "2026-01-10T13:00:00Z",
-  },
-  {
-    _id: "8",
-    title: "Hiring: We're looking for designers",
-    description: "Join our growing design team...",
-    media: { photo: "https://picsum.photos/seed/post8/400/300" },
-    likes: Array(45).fill("userId"),
-    comments: Array(12).fill({ user: "userId", text: "Shared!", createdAt: new Date() }),
-    createdAt: "2026-01-05T10:30:00Z",
-  },
-];
+import { usePlanAccess } from "@/hooks/usePlanAccess";
+import { UpgradeModal } from "@/components/UpgradeModal";
+import { Button } from "@/components/ui/button";
 
 /* -------------------- HELPERS -------------------- */
 
@@ -127,8 +57,9 @@ const TOOLTIP_STYLE = {
   borderRadius: "8px",
   fontSize: "12px",
 };
+const BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 
-function getPostType(post: typeof mockPosts[0]): "photo" | "video" | "text" {
+function getPostType(post: Post): "photo" | "video" | "text" {
   if (post.media?.video) return "video";
   if (post.media?.photo) return "photo";
   return "text";
@@ -144,19 +75,54 @@ function getWeekLabel(dateStr: string): string {
 /* -------------------- PAGE -------------------- */
 
 export default function SocialMediaAnalysisPage() {
+  const { 
+    hasAccess, 
+    loading: planLoading, 
+    isUpgradeModalOpen, 
+    closeUpgradeModal, 
+    triggeredFeature,
+    checkAccessAndShowModal
+  } = usePlanAccess();
   const navigate = useNavigate();
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPosts = async () => {
+      if (!hasAccess("socialRecruiter")) {
+        setLoading(false);
+        return;
+      }
+      try {
+        setLoading(true);
+        const result = await postService.getStartupPosts();
+        if (result.success && result.data) {
+          setPosts(result.data);
+        } else {
+            console.warn("Failed to fetch posts");
+            setPosts([]);
+        }
+      } catch (error) {
+        console.error("Error fetching posts:", error);
+        setPosts([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPosts();
+  }, [hasAccess]);
 
   const analytics = useMemo(() => {
-    const totalPosts = mockPosts.length;
-    const totalLikes = mockPosts.reduce((sum, p) => sum + p.likes.length, 0);
-    const totalComments = mockPosts.reduce((sum, p) => sum + p.comments.length, 0);
+    const totalPosts = posts.length;
+    const totalLikes = posts.reduce((sum, p) => sum + (p.likes?.length || 0), 0);
+    const totalComments = posts.reduce((sum, p) => sum + (p.comments?.length || 0), 0);
     const avgEngagement = totalPosts > 0 ? ((totalLikes + totalComments) / totalPosts).toFixed(1) : "0";
 
     // Engagement trend by week
     const weekMap = new Map<string, number>();
-    mockPosts.forEach((p) => {
+    posts.forEach((p) => {
       const week = getWeekLabel(p.createdAt);
-      const engagement = p.likes.length + p.comments.length;
+      const engagement = (p.likes?.length || 0) + (p.comments?.length || 0);
       weekMap.set(week, (weekMap.get(week) || 0) + engagement);
     });
     const engagementTrend = Array.from(weekMap.entries())
@@ -164,13 +130,14 @@ export default function SocialMediaAnalysisPage() {
       .sort((a, b) => new Date(a.week).getTime() - new Date(b.week).getTime());
 
     // Top performing posts
-    const topPosts = [...mockPosts]
+    const topPosts = [...posts]
       .map((p) => ({
         _id: p._id,
-        title: p.title,
-        likes: p.likes.length,
-        comments: p.comments.length,
-        engagement: p.likes.length + p.comments.length,
+        title: p.title || "Untitled Post",
+        likes: p.likes?.length || 0,
+        comments: p.comments?.length || 0,
+        engagement: (p.likes?.length || 0) + (p.comments?.length || 0),
+        // @ts-ignore
         type: getPostType(p),
         thumbnail: p.media?.photo,
       }))
@@ -178,10 +145,11 @@ export default function SocialMediaAnalysisPage() {
 
     // Post type performance
     const typeMap: Record<string, { total: number; count: number }> = {};
-    mockPosts.forEach((p) => {
+    posts.forEach((p) => {
+      // @ts-ignore
       const type = getPostType(p);
       if (!typeMap[type]) typeMap[type] = { total: 0, count: 0 };
-      typeMap[type].total += p.likes.length + p.comments.length;
+      typeMap[type].total += (p.likes?.length || 0) + (p.comments?.length || 0);
       typeMap[type].count += 1;
     });
     const postTypePerformance = Object.entries(typeMap).map(([type, data]) => ({
@@ -192,14 +160,15 @@ export default function SocialMediaAnalysisPage() {
     // Posting frequency
     const now = new Date();
     const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    const postsThisMonth = mockPosts.filter((p) => new Date(p.createdAt) >= thisMonthStart).length;
-    const postsThisWeek = mockPosts.filter((p) => new Date(p.createdAt) >= oneWeekAgo).length;
+    const postsThisMonth = posts.filter((p) => new Date(p.createdAt) >= thisMonthStart).length;
+    const postsThisWeek = posts.filter((p) => new Date(p.createdAt) >= new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)).length;
 
     // Avg posts per month (based on data range)
-    const dates = mockPosts.map((p) => new Date(p.createdAt).getTime());
-    const rangeMonths = Math.max(1, Math.ceil((Math.max(...dates) - Math.min(...dates)) / (30 * 24 * 60 * 60 * 1000)));
+    const dates = posts.length > 0 ? posts.map((p) => new Date(p.createdAt).getTime()) : [now.getTime()];
+    const minDate = Math.min(...dates);
+    const maxDate = Math.max(...dates);
+    const rangeMonths = Math.max(1, Math.ceil((maxDate - minDate) / (30 * 24 * 60 * 60 * 1000)));
     const avgPostsPerMonth = (totalPosts / rangeMonths).toFixed(1);
 
     return {
@@ -214,7 +183,18 @@ export default function SocialMediaAnalysisPage() {
       postsThisWeek,
       avgPostsPerMonth,
     };
-  }, []);
+  }, [posts]);
+
+  if (loading) {
+    return (
+      <StartupLayout>
+          <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-accent" />
+            <span className="ml-3 text-muted-foreground font-medium">Analyzing your social presence...</span>
+          </div>
+      </StartupLayout>
+    );
+  }
 
   const statCards = [
     {
@@ -238,6 +218,34 @@ export default function SocialMediaAnalysisPage() {
       icon: TrendingUp,
     },
   ];
+
+  if (planLoading) {
+    return (
+      <StartupLayout>
+        <div className="h-[60vh] flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </StartupLayout>
+    );
+  }
+
+  if (!hasAccess("socialRecruiter")) {
+    return (
+      <StartupLayout>
+          <div className="h-[70vh] flex flex-col items-center justify-center text-center p-6 bg-card rounded-xl border-2 border-dashed">
+              <TrendingUp className="h-16 w-16 text-muted-foreground mb-4" />
+              <h2 className="text-2xl font-bold mb-2">Content Performance Insights</h2>
+              <p className="text-muted-foreground max-w-md mb-6">
+                  Analyze your social presence, engagement rates, and content efficiency. 
+                  Upgrade to Pro or Enterprise plan to access this feature.
+              </p>
+              <Button size="lg" onClick={() => navigate("/startup/select-plan")}>
+                  Upgrade to Premium
+              </Button>
+          </div>
+      </StartupLayout>
+    );
+  }
 
   return (
     <StartupLayout>
@@ -406,7 +414,7 @@ export default function SocialMediaAnalysisPage() {
                           <div className="flex items-center gap-3">
                             {post.thumbnail && (
                               <img
-                                src={post.thumbnail}
+                                src={`${BASE_URL}${post.thumbnail}`}
                                 alt=""
                                 className="h-8 w-8 rounded object-cover shrink-0"
                               />
@@ -470,6 +478,7 @@ export default function SocialMediaAnalysisPage() {
           </Card>
         </div>
       </div>
+      <UpgradeModal isOpen={isUpgradeModalOpen} onClose={closeUpgradeModal} featureName={triggeredFeature || "Social Media Analysis"} />
     </StartupLayout>
   );
 }

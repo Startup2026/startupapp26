@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Upload, FileText, Send, CheckCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Upload, FileText, Send, CheckCircle, Info } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -29,10 +29,31 @@ export function JobApplicationModal({
   const [step, setStep] = useState<"form" | "success">("form");
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [storedResumeUrl, setStoredResumeUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const user = getStoredUser();
+      if (!user?._id || !open) return;
+
+      try {
+        const res = await apiFetch(`/student-profiles/me`);
+        if (res.success && res.data?.resumeUrl) {
+          setStoredResumeUrl(res.data.resumeUrl);
+        }
+      } catch (err) {
+        console.error("Failed to fetch profile resume:", err);
+      }
+    };
+    fetchProfile();
+  }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resumeFile) return;
+    if (!resumeFile && !storedResumeUrl) {
+        toast({ title: "Resume Required", description: "Please upload a resume or set one in your profile.", variant: "destructive" });
+        return;
+    }
 
     const user = getStoredUser();
     if (!user?._id) {
@@ -44,7 +65,9 @@ export function JobApplicationModal({
 
     try {
         const formData = new FormData();
-        formData.append('resume', resumeFile);
+        if (resumeFile) {
+            formData.append('resume', resumeFile);
+        }
         
         const res = await apiFetch(`/applications/${job.id}/${user._id}`, {
             method: 'POST',
@@ -55,7 +78,7 @@ export function JobApplicationModal({
             setStep("success");
             toast({
               title: "Application Submitted!",
-              description: `Your resume for ${job.title} at ${job.company} has been submitted. Status: ${(res.data as any)?.status}`,
+              description: `Your application for ${job.title} at ${job.company} has been submitted. Status: ${(res.data as any)?.status}`,
             });
         } else {
              toast({
@@ -100,18 +123,28 @@ export function JobApplicationModal({
             </DialogHeader>
 
             <form onSubmit={handleSubmit} className="space-y-6 mt-4">
+              {/* Stored Resume Notice */}
+              {storedResumeUrl && !resumeFile && (
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-accent/5 border border-accent/20">
+                  <Info className="h-5 w-5 text-accent shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium text-accent">Using profile resume</p>
+                    <p className="text-muted-foreground">We'll use the resume from your profile. Upload a new one below to override it.</p>
+                  </div>
+                </div>
+              )}
+
               {/* Resume Upload */}
               <div className="space-y-2">
-                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-accent transition-colors cursor-pointer">
+                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-accent transition-colors cursor-pointer relative">
                   <input
                     id="resume"
                     type="file"
                     accept=".pdf,.doc,.docx"
                     className="hidden"
                     onChange={handleFileChange}
-                    required
                   />
-                  <label htmlFor="resume" className="cursor-pointer">
+                  <label htmlFor="resume" className="cursor-pointer block">
                     {resumeFile ? (
                       <div className="flex items-center justify-center gap-2 text-accent">
                         <FileText className="h-5 w-5" />
@@ -121,7 +154,7 @@ export function JobApplicationModal({
                       <div className="space-y-2">
                         <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
                         <p className="text-sm text-muted-foreground">
-                          Click to upload your resume
+                          {storedResumeUrl ? "Change resume" : "Click to upload your resume"}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           PDF, DOC, DOCX (Max 5MB)
@@ -136,13 +169,13 @@ export function JobApplicationModal({
                 <Button type="button" variant="outline" className="flex-1" onClick={handleClose}>
                   Cancel
                 </Button>
-                <Button type="submit" variant="hero" className="flex-1" disabled={isSubmitting || !resumeFile}>
+                <Button type="submit" variant="hero" className="flex-1" disabled={isSubmitting || (!resumeFile && !storedResumeUrl)}>
                   {isSubmitting ? (
                     "Submitting..."
                   ) : (
                     <>
                       <Send className="h-4 w-4 mr-2" />
-                      Submit Resume
+                      {resumeFile ? "Submit New Resume" : storedResumeUrl ? "Submit Profile Resume" : "Submit Resume"}
                     </>
                   )}
                 </Button>

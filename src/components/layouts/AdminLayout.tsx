@@ -79,7 +79,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   return (
     <div className="min-h-screen flex w-full bg-background overflow-hidden">
       {/* Sidebar - Desktop */}
-      <aside className="hidden lg:flex lg:w-64 flex-col bg-sidebar border-r border-sidebar-border sticky top-0 h-screen shrink-0">
+      <aside className="hidden lg:flex lg:w-64 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border sticky top-0 h-screen shrink-0">
         <div className="p-6">
           <Logo size="sm" />
         </div>
@@ -109,10 +109,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   <Menu className="h-6 w-6" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[280px] p-0 bg-sidebar border-r-0">
-                <div className="p-6 border-b border-sidebar-border flex items-center gap-3">
+              <SheetContent side="left" className="w-[280px] p-0 bg-sidebar text-sidebar-foreground border-r-0">
+                <div className="p-6 border-b border-sidebar-border">
                   <Logo size="sm" />
-                  <span className="text-xl font-bold text-sidebar-foreground">Admin</span>
                 </div>
                 <div className="px-4 py-6">
                   <NavLinks isMobile />

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
   Briefcase, 
   MapPin, 
@@ -38,32 +38,69 @@ interface TrendingJob {
 
 export default function TrendingJobsPage() {
   const [jobs, setJobs] = useState<TrendingJob[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const user = getStoredUser();
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const observerTarget = useRef(null);
 
   useEffect(() => {
     const fetchTrendingJobs = async () => {
       setLoading(true);
       try {
-        // Calls the trending endpoint we added to your routes
         const endpoint = user?._id 
-          ? `/recommendations/trending/jobs` 
-          : `/recommendations/cold-start?type=trending-jobs&limit=20`;
+          ? `/recommendations/trending/jobs?limit=10&page=${page}` 
+          : `/recommendations/cold-start?type=trending-jobs&limit=10&page=${page}`;
         
         const res = await apiFetch(endpoint);
         if (res.success && Array.isArray(res.data)) {
-          setJobs(res.data);
+           if (res.data.length === 0) {
+             setHasMore(false);
+           } else {
+             setJobs(prev => {
+                const newJobs = page === 1 ? res.data : [...prev, ...res.data];
+                return Array.from(new Map(newJobs.map(j => [j._id, j])).values());
+             });
+           }
+        } else {
+           setHasMore(false);
         }
       } catch (error) {
         console.error("Error fetching trending jobs:", error);
       } finally {
         setLoading(false);
+        setIsInitialLoading(false);
       }
     };
 
     fetchTrendingJobs();
-  }, [user?._id]);
+  }, [page, user?._id]);
+
+  // Infinite Scroll Observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && hasMore && !loading) {
+          setPage(prev => prev + 1);
+        }
+      },
+      { threshold: 1.0 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => {
+      if (observerTarget.current) {
+        observer.unobserve(observerTarget.current);
+      }
+    };
+  }, [hasMore, loading]);
 
   // Client-side filtering for the search bar
   const filteredJobs = jobs.filter(job => 
@@ -107,13 +144,14 @@ export default function TrendingJobsPage() {
 
         {/* Jobs List */}
         <div className="max-w-5xl mx-auto space-y-4">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-20">
+          {isInitialLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 animate-pulse">
               <Loader2 className="h-10 w-10 animate-spin text-accent mb-4" />
               <p className="text-muted-foreground font-medium">Analyzing trends for you...</p>
             </div>
           ) : filteredJobs.length > 0 ? (
-            filteredJobs.map((job) => (
+            <>
+            {filteredJobs.map((job) => (
               <Card key={job._id} className="overflow-hidden hover:border-accent/40 transition-all group">
                 <CardContent className="p-0">
                   <div className="flex flex-col md:flex-row md:items-center">
@@ -168,8 +206,20 @@ export default function TrendingJobsPage() {
                   </div>
                 </CardContent>
               </Card>
-            ))
+            ))}
+            {loading && hasMore && (
+               <div className="flex justify-center p-8 w-full">
+                  <Loader2 className="animate-spin h-6 w-6 text-primary" />
+               </div>
+            )}
+            {!loading && hasMore && (
+               <div ref={observerTarget} className="flex justify-center p-8 w-full h-10">
+               </div>
+            )}
+            </>
           ) : (
+            
+            filteredJobs.length === 0 && !isInitialLoading && (
             <Card className="p-20 text-center border-dashed">
               <div className="flex flex-col items-center gap-4">
                 <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center">
@@ -179,9 +229,12 @@ export default function TrendingJobsPage() {
                 <p className="text-muted-foreground max-w-xs mx-auto">
                   Try adjusting your search or check back later as trends update constantly.
                 </p>
-                <Button variant="outline" onClick={() => setSearchQuery("")}>Clear Search</Button>
+                {searchQuery && (
+                   <Button variant="outline" onClick={() => setSearchQuery("")}>Clear Search</Button>
+                )}
               </div>
             </Card>
+            )
           )}
         </div>
       </div>

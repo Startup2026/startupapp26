@@ -30,6 +30,10 @@ export interface StartupProfile {
   }>;
   hiring?: boolean;
   verified?: boolean;
+  views?: number;
+  subscriptionPlan: "FREE" | "GROWTH" | "PRO" | "ENTERPRISE";
+  subscriptionStatus: "ACTIVE" | "TRIAL" | "EXPIRED";
+  subscriptionEndDate?: string;
 }
 
 export interface CreateStartupProfileData {
@@ -92,6 +96,13 @@ export const startupProfileService = {
   async deleteProfile(id: string): Promise<{ success: boolean; data?: StartupProfile; error?: string }> {
     return apiFetch<StartupProfile>(`/startupProfile/${id}`, {
       method: 'DELETE',
+    });
+  },
+
+  async selectPlan(plan: string): Promise<{ success: boolean; data?: any; error?: string }> {
+    return apiFetch('/startupProfile/select-plan', {
+      method: 'POST',
+      body: JSON.stringify({ plan }),
     });
   },
 };

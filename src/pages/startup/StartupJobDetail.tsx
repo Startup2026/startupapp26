@@ -2,12 +2,11 @@
 
 
 import { useState, useEffect } from "react";
-import { Briefcase, Users, Search } from "lucide-react";
+import { Briefcase, Users, Search, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -20,22 +19,25 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { StartupLayout } from "@/components/layouts/StartupLayout";
+import { jobService } from "@/services/jobService";
+import { applicationService } from "@/services/applicationService";
+import { startupProfileService } from "@/services/startupProfileService";
+import { format } from "date-fns";
 
 /* ---------------- TYPES ---------------- */
 
 type ApplicantStatus =
-  | "Applied"
-  | "Shortlisted"
-  | "Interview Scheduled"
-  | "Selected"
-  | "Rejected";
+  | "APPLIED"
+  | "SHORTLISTED"
+  | "INTERVIEW_SCHEDULED"
+  | "HIRED"
+  | "REJECTED";
 
 interface Applicant {
-  id: string;
-  jobId: number;
+  id: string; // This is the Application ID
+  jobId: string;
   name: string;
   email: string;
   role: string;
@@ -48,129 +50,137 @@ interface Applicant {
 }
 
 interface Job {
-  id: number;
+  id: string;
   title: string;
   description: string;
-  experienceRequired: string;
-  educationRequired: string;
   skillsRequired: string[];
   applicants: Applicant[];
   postedOn: string;
-  status: "Open" | "Closed";
+  status: "Open" | "Closed"; // Mapping this might be tricky if backend doesn't support it yet, default Open
 }
-
-/* ---------------- DATA ---------------- */
-
-const skillsList = [
-  "React",
-  "Node.js",
-  "MongoDB",
-  "Express",
-  "Python",
-  "Java",
-  "AWS",
-  "Docker",
-];
-
-const hardcodedJobs: Job[] = [
-  {
-    id: 101,
-    title: "Frontend Developer",
-    description: "Looking for a React developer with strong UI skills.",
-    experienceRequired: "1-3 years",
-    educationRequired: "B.E / B.Tech",
-    skillsRequired: ["React", "JavaScript", "CSS"],
-    postedOn: "2025-01-10",
-    status: "Open",
-    applicants: [
-      {
-        id: "1",
-        jobId: 101,
-        name: "Amit Sharma",
-        email: "amit@gmail.com",
-        role: "Frontend Developer",
-        appliedOn: "2025-01-12",
-        skills: ["React", "JavaScript", "CSS"],
-        resumeUrl: "/resumes/amit-sharma.pdf",
-        experience: 2,
-        education: "B.E Computer Engineering",
-        status: "Applied",
-      },
-    ],
-  },
-];
 
 /* ---------------- COMPONENT ---------------- */
 
 export default function StartupJobDetail() {
-  const [jobs, setJobs] = useState<Job[]>(() => {
-    if (typeof window === "undefined") return [];
-
-    const stored = localStorage.getItem("startup_jobs");
-    if (stored) return JSON.parse(stored);
-
-    localStorage.setItem("startup_jobs", JSON.stringify(hardcodedJobs));
-    return hardcodedJobs;
-  });
-
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-  const [selectedApplicant, setSelectedApplicant] = useState<Applicant | null>(
-    null,
-  );
+  const [selectedApplicant, setSelectedApplicant] = useState<Applicant | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const toggleJobStatus = (jobId: number) => {
-    setJobs((prevJobs): Job[] => {
-      const updatedJobs: Job[] = prevJobs.map((job) =>
-        job.id === jobId
-          ? {
-              ...job,
-              status: job.status === "Open" ? "Closed" : "Open",
-            }
-          : job,
-      );
+  useEffect(() => {
+    const fetchAllData = async () => {
+        try {
+            setLoading(true);
+            const profileRes = await startupProfileService.getMyProfile();
+            if(!profileRes.success || !profileRes.data) return;
+            const profileId = profileRes.data._id;
 
-      localStorage.setItem("startup_jobs", JSON.stringify(updatedJobs));
-      return updatedJobs;
-    });
+            const jobsRes = await jobService.getAllJobs();
+            if(!jobsRes.success || !jobsRes.data) return;
 
-    toast({
-      title: "Job Status Updated",
-      description: "Job position status changed",
-    });
+            const myJobs = jobsRes.data.filter((j: any) => {
+                 const jSid = typeof j.startupId === 'object' ? j.startupId._id : j.startupId;
+                 return jSid === profileId;
+            });
+
+            const appRes = await applicationService.getAllApplications();
+            
+            const relevantApps = appRes.success && appRes.data ? appRes.data : [];
+
+            const processedJobs: Job[] = myJobs.map((job: any) => {
+                const jobApps = relevantApps.filter((a: any) => {
+                    const aJobId = typeof a.jobId === 'object' ? a.jobId._id : a.jobId;
+                    return aJobId === job._id;
+                });
+
+                const applicants: Applicant[] = jobApps.map((a: any) => {
+                    const s = a.studentId || {};
+                    return {
+                        id: a._id,
+                        jobId: job._id,
+                        name: s.firstName ? `${s.firstName} ${s.lastName}` : "Unknown",
+                        email: s.email || "",
+                        role: job.role,
+                        appliedOn: a.createdAt ? format(new Date(a.createdAt), 'yyyy-MM-dd') : 'N/A',
+                        skills: s.skills || [],
+                        resumeUrl: a.resumeUrl || s.resumeUrl || "#",
+                        experience: s.experience?.length || 0,
+                        education: s.education?.length > 0 ? s.education[0].degree : "N/A",
+                        status: a.status as ApplicantStatus
+                    };
+                });
+
+                return {
+                    id: job._id,
+                    title: job.role,
+                    description: job.aboutRole || "No description",
+                    skillsRequired: job.Tag || [],
+                    applicants: applicants,
+                    postedOn: job.createdAt ? format(new Date(job.createdAt), 'yyyy-MM-dd') : 'N/A',
+                    status: (job.deadline && new Date(job.deadline) < new Date()) ? "Closed" : "Open"
+                };
+            });
+
+            setJobs(processedJobs);
+        } catch(e) {
+            console.error(e);
+            toast({ title: "Error", description: "Failed to load jobs", variant: "destructive" });
+        } finally {
+            setLoading(false);
+        }
+    };
+    fetchAllData();
+  }, []);
+
+  const toggleJobStatus = async (jobId: string) => {
+     // Optional: If backend supports toggling status
+     toast({ title: "Info", description: "Job status toggling involves editing deadline. Not implemented yet." });
   };
 
-  const handleStatusUpdate = (
-    jobId: number,
-    applicantId: string,
-    status: ApplicantStatus,
+  const handleStatusUpdate = async (
+    jobId: string,
+    applicationId: string,
+    status: ApplicantStatus
   ) => {
-    const updatedJobs = jobs.map((job) =>
-      job.id !== jobId
-        ? job
-        : {
-            ...job,
-            applicants: job.applicants.map((a) =>
-              a.id === applicantId ? { ...a, status } : a,
-            ),
-          },
-    );
+    try {
+        const res = await applicationService.updateApplication(applicationId, { status });
+        if(res.success) {
+             setJobs(prev => prev.map(job => 
+                 job.id === jobId ? {
+                     ...job,
+                     applicants: job.applicants.map(a => a.id === applicationId ? { ...a, status } : a)
+                 } : job
+             ));
 
-    setJobs(updatedJobs);
-    localStorage.setItem("startup_jobs", JSON.stringify(updatedJobs));
+             if (selectedApplicant && selectedApplicant.id === applicationId) {
+                setSelectedApplicant({ ...selectedApplicant, status });
+             }
 
-    if (selectedApplicant) {
-      setSelectedApplicant({ ...selectedApplicant, status });
+             if (selectedJob && selectedJob.id === jobId) {
+                 setSelectedJob(prev => prev ? {
+                     ...prev,
+                     applicants: prev.applicants.map(a => a.id === applicationId ? { ...a, status } : a)
+                 } : null);
+             }
+
+             toast({ title: "Updated", description: `Status changed to ${status}` });
+        }
+    } catch(e) {
+        toast({ title: "Error", description: "Failed to update status", variant: "destructive" });
     }
-
-    toast({
-      title: "Status Updated",
-      description: `Applicant marked as ${status}`,
-    });
   };
 
   const filteredJobs = jobs.filter((job) =>
-    job.title.toLowerCase().includes(searchQuery.toLowerCase()),
+    job.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  if (loading) return (
+      <StartupLayout>
+          <div className="flex bg-background h-[calc(100vh-4rem)] items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+      </StartupLayout>
   );
 
   return (
@@ -196,22 +206,15 @@ export default function StartupJobDetail() {
 
         {/* JOB CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredJobs.map((job) => (
+          {filteredJobs.length === 0 ? <p className="col-span-full text-center text-muted-foreground">No jobs posted yet.</p> : 
+          filteredJobs.map((job) => (
             <Card key={job.id}>
               <CardHeader>
                 <div className="flex justify-between">
-                  <CardTitle>{job.title}</CardTitle>
+                  <CardTitle className="truncate" title={job.title}>{job.title}</CardTitle>
 
                   <Badge
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleJobStatus(job.id);
-                    }}
-                    className={`cursor-pointer ${
-                      job.status === "Open"
-                        ? "bg-teal-500 text-white hover:bg-teal-600"
-                        : "bg-gray-400 text-white hover:bg-gray-500"
-                    }`}
+                    variant={job.status === "Open" ? "default" : "secondary"}
                   >
                     {job.status}
                   </Badge>
@@ -219,16 +222,17 @@ export default function StartupJobDetail() {
               </CardHeader>
 
               <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground line-clamp-2" title={job.description}>
                   {job.description}
                 </p>
 
                 <div className="flex flex-wrap gap-1">
-                  {job.skillsRequired.map((s) => (
-                    <Badge key={s} variant="outline">
+                  {job.skillsRequired.slice(0, 3).map((s, i) => (
+                    <Badge key={i} variant="outline">
                       {s}
                     </Badge>
                   ))}
+                  {job.skillsRequired.length > 3 && <Badge variant="outline">+{job.skillsRequired.length - 3}</Badge>}
                 </div>
 
                 <div className="flex items-center gap-2 text-sm">
@@ -239,7 +243,7 @@ export default function StartupJobDetail() {
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={job.status === "Closed"}
+                  className="w-full"
                   onClick={() => setSelectedJob(job)}
                 >
                   View Applicants
@@ -256,30 +260,30 @@ export default function StartupJobDetail() {
               <DialogTitle>Applicants for {selectedJob?.title}</DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-              {selectedJob?.applicants.map((a) => (
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+              {selectedJob?.applicants.length === 0 ? <p className="text-center text-muted-foreground">No applicants yet.</p> :
+               selectedJob?.applicants.map((a) => (
                 <Card
                   key={a.id}
                   onClick={() => {
-                    setSelectedApplicant({ ...a, jobId: selectedJob!.id });
-                    setSelectedJob(null);
+                    setSelectedApplicant(a);
+                    // Keep parent dialog open? No, typically nested dialogs or side-by-side. 
+                    // Shadcn Dialog inside Dialog issues? Assuming acceptable. 
+                    // Often better to close parent or trigger separate state.
+                    // The original code kept selectedJob non-null.
                   }}
-                  className="cursor-pointer hover:bg-muted/40"
+                  className="cursor-pointer hover:bg-muted/40 transition-colors"
                 >
-                  <CardContent className="p-4 flex justify-between">
+                  <CardContent className="p-4 flex justify-between items-center">
                     <div>
                       <p className="font-medium">{a.name}</p>
                       <p className="text-xs text-muted-foreground">{a.email}</p>
                     </div>
 
                     <Badge
-                      className={
-                        a.status === "Rejected"
-                          ? "bg-red-500 text-white"
-                          : "bg-teal-500 text-white"
-                      }
+                       variant={a.status ==='REJECTED' ? 'destructive' : a.status === 'HIRED' ? 'success' : 'secondary'}
                     >
-                      {a.status}
+                      {a.status.replace("_", " ")}
                     </Badge>
                   </CardContent>
                 </Card>
@@ -316,13 +320,9 @@ export default function StartupJobDetail() {
 
                 <div className="flex items-center gap-3">
                   <Badge
-                    className={
-                      selectedApplicant.status === "Rejected"
-                        ? "bg-red-500 text-white"
-                        : "bg-teal-500 text-white"
-                    }
+                     variant={selectedApplicant.status ==='REJECTED' ? 'destructive' : selectedApplicant.status === 'HIRED' ? 'success' : 'secondary'}
                   >
-                    {selectedApplicant.status}
+                    {selectedApplicant.status.replace("_", " ")}
                   </Badge>
 
                   <DropdownMenu>
@@ -333,11 +333,11 @@ export default function StartupJobDetail() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
                       {[
-                        "Applied",
-                        "Shortlisted",
-                        "Interview Scheduled",
-                        "Selected",
-                        "Rejected",
+                        "APPLIED",
+                        "SHORTLISTED",
+                        "INTERVIEW_SCHEDULED",
+                        "HIRED",
+                        "REJECTED",
                       ].map((s) => (
                         <DropdownMenuItem
                           key={s}
@@ -349,7 +349,7 @@ export default function StartupJobDetail() {
                             )
                           }
                         >
-                          {s}
+                          {s.replace("_", " ")}
                         </DropdownMenuItem>
                       ))}
                     </DropdownMenuContent>
@@ -359,8 +359,8 @@ export default function StartupJobDetail() {
                 <div>
                   <p className="text-sm font-medium">Skills</p>
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {selectedApplicant.skills.map((skill) => (
-                      <Badge key={skill} variant="outline">
+                    {selectedApplicant.skills.map((skill, i) => (
+                      <Badge key={i} variant="outline">
                         {skill}
                       </Badge>
                     ))}
@@ -372,10 +372,10 @@ export default function StartupJobDetail() {
 
                 <Button
                   asChild
-                  className="outline bg-teal-500 text-white hover:bg-teal-600"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                   <a
-                    href={selectedApplicant.resumeUrl}
+                    href={selectedApplicant.resumeUrl.startsWith('http') ? selectedApplicant.resumeUrl : `http://localhost:3000${selectedApplicant.resumeUrl}`}
                     target="_blank"
                     rel="noopener noreferrer"
                   >

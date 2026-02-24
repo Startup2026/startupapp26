@@ -1,12 +1,5 @@
-import nodemailer from 'nodemailer';
-import { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM } from '../config';
-
-const transporter = nodemailer.createTransport({
-  host: SMTP_HOST,
-  port: SMTP_PORT || 587,
-  secure: SMTP_PORT === 465,
-  auth: SMTP_USER ? { user: SMTP_USER, pass: SMTP_PASS } : undefined,
-});
+import axios from 'axios';
+import { EMAIL_FROM, BREVO_API_KEY } from '../config';
 
 export async function sendVerificationEmail(to: string, token: string, platformName = 'Wostup') {
   const html = `
@@ -20,10 +13,29 @@ export async function sendVerificationEmail(to: string, token: string, platformN
     </div>
   `;
 
-  await transporter.sendMail({
-    from: EMAIL_FROM,
-    to,
-    subject: `Verify Your Email – ${platformName}`,
-    html,
-  });
+  if (!BREVO_API_KEY) {
+    throw new Error('BREVO_API_KEY is missing');
+  }
+
+  try {
+    await axios.post(
+      'https://api.brevo.com/v3/smtp/email',
+      {
+        sender: { email: EMAIL_FROM, name: platformName },
+        to: [{ email: to }],
+        subject: `Verify Your Email – ${platformName}`,
+        htmlContent: html,
+      },
+      {
+        headers: {
+          'api-key': BREVO_API_KEY,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+    console.log(`Verification email sent to ${to} via Brevo`);
+  } catch (error: any) {
+    console.error('Brevo Email Error:', error.response?.data || error.message);
+    throw error;
+  }
 }

@@ -32,14 +32,12 @@ import { cn } from "@/lib/utils";
 interface ManualShortlistingPanelProps {
   applicants: Applicant[];
   onStatusChange: (id: string, status: ApplicationStatus, notes?: string) => void;
-  onScheduleInterview: (applicant: Applicant) => void;
   onSendEmail: (applicant: Applicant) => void;
 }
 
 export function ManualShortlistingPanel({
   applicants,
   onStatusChange,
-  onScheduleInterview,
   onSendEmail,
 }: ManualShortlistingPanelProps) {
   const [selectedApplicant, setSelectedApplicant] = useState<Applicant | null>(null);
@@ -156,7 +154,7 @@ export function ManualShortlistingPanel({
                 {selectedApplicant.resumeUrl && (
                   <Button variant="outline" size="sm" asChild>
                     <a
-                      href={selectedApplicant.resumeUrl}
+                      href={selectedApplicant.resumeUrl.startsWith('http') ? selectedApplicant.resumeUrl : `http://localhost:3000${selectedApplicant.resumeUrl}`}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -231,13 +229,6 @@ export function ManualShortlistingPanel({
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
                   Shortlist
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleStatusUpdate("INTERVIEW_SCHEDULED")}
-                >
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Schedule Interview
                 </Button>
                 <Button
                   variant="outline"

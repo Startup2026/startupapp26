@@ -23,11 +23,13 @@ import {
   Rocket,
   Heart,
 } from "lucide-react";
+import { API_BASE_URL } from "@/lib/api";
 
 export default function StartupProfilePage() {
   const { id } = useParams<{ id: string }>();
   const [startup, setStartup] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 
   useEffect(() => {
     const fetchStartupDetails = async () => {
@@ -97,7 +99,11 @@ export default function StartupProfilePage() {
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row gap-6">
               <Avatar className="h-24 w-24 rounded-xl border-2 border-border">
-                <AvatarImage src={startup.profilepic} alt={startup.startupName} className="object-cover" />
+                <AvatarImage 
+                  src={startup.profilepic ? `${BASE_URL}${startup.profilepic}` : undefined} 
+                  alt={startup.startupName} 
+                  className="object-cover" 
+                />
                 <AvatarFallback className="rounded-xl text-2xl font-bold bg-accent/10 text-accent">
                   {startup.startupName?.charAt(0)}
                 </AvatarFallback>

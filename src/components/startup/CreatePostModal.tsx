@@ -1,8 +1,8 @@
 
 
 
-import { useState, ChangeEvent } from "react";
-import { FileText, Image, Video, CheckCircle } from "lucide-react";
+import { useState, ChangeEvent, useEffect } from "react";
+import { FileText, Image, Video, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -14,26 +14,47 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
+import { postService } from "@/services/postService";
 
 interface CreatePostModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
+  initialData?: {
+    id: string;
+    title: string;
+    description: string;
+  };
 }
 
 interface PostFormData {
   title: string;
   description: string;
-  photo: File | null;
+  image: File | null;
   video: File | null;
 }
 
-export function CreatePostModal({ open, onOpenChange }: CreatePostModalProps) {
-  const [formData, setFormData] = useState<PostFormData>({
+export function CreatePostModal({ open, onOpenChange, onSuccess, initialData }: CreatePostModalProps) {
+  const [formData, setFormData] = useState<any>({
     title: "",
     description: "",
-    photo: null,
+    image: null,
     video: null,
   });
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Initialize form data when modal opens or initialData changes
+  useEffect(() => {
+    if (open) {
+      setFormData({
+        title: initialData?.title || "",
+        description: initialData?.description || "",
+        image: null,
+        video: null,
+      });
+    }
+  }, [open, initialData]);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -46,15 +67,46 @@ export function CreatePostModal({ open, onOpenChange }: CreatePostModalProps) {
     setFormData((prev) => ({ ...prev, [name]: files[0] }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Post Created:", formData);
-    toast({
-      title: "Post Published",
-      description: "Your update has been shared with students.",
-    });
-    onOpenChange(false);
-    setFormData({ title: "", description: "", photo: null, video: null });
+    
+    if (!formData.description && !formData.title) {
+        toast({ title: "Error", description: "Please provide a title or description", variant: "destructive" });
+        return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const data = new FormData();
+      data.append("title", formData.title);
+      data.append("description", formData.description);
+      if (formData.image) data.append("image", formData.image);
+      if (formData.video) data.append("video", formData.video);
+
+      let result;
+      if (initialData?.id) {
+        result = await postService.updatePost(initialData.id, data);
+      } else {
+        result = await postService.createPost(data);
+      }
+
+      if (result.success) {
+        toast({
+          title: initialData ? "Post Updated" : "Post Published",
+          description: initialData ? "Your post has been updated." : "Your update has been shared with students.",
+        });
+        onOpenChange(false);
+        setFormData({ title: "", description: "", image: null, video: null });
+        if (onSuccess) onSuccess();
+      } else {
+          toast({ title: "Failed", description: result.error || "Could not process request", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error("Post creation error:", error);
+      toast({ title: "Error", description: "A network error occurred", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -63,7 +115,7 @@ export function CreatePostModal({ open, onOpenChange }: CreatePostModalProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <FileText className="h-5 w-5 text-accent" />
-            Create Post
+            {initialData ? "Edit Post" : "Create New Post"}
           </DialogTitle>
         </DialogHeader>
 
@@ -98,10 +150,10 @@ export function CreatePostModal({ open, onOpenChange }: CreatePostModalProps) {
               </Label>
               <Input
                 type="file"
-                name="photo"
+                name="image"
                 accept="image/*"
                 onChange={handleFileChange}
-                className="mt-1.5"
+                className="mt-1.5 cursor-pointer"
               />
             </div>
             <div>
@@ -113,15 +165,29 @@ export function CreatePostModal({ open, onOpenChange }: CreatePostModalProps) {
                 name="video"
                 accept="video/*"
                 onChange={handleFileChange}
-                className="mt-1.5"
+                className="mt-1.5 cursor-pointer"
               />
             </div>
           </div>
 
-          <Button type="submit" variant="hero" className="w-full gap-2">
-            <CheckCircle className="h-4 w-4" />
-            Publish Post
-          </Button>
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button variant="accent" className="gap-2 px-8" disabled={isSubmitting}>
+              {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {initialData ? "Updating..." : "Posting..."}
+                  </>
+              ) : (initialData ? "Update Post" : "Post Now")}
+            </Button>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

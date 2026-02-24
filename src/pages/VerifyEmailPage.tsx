@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/services/authService";
 import { useLocation } from 'react-router-dom';
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function VerifyEmailPage() {
   const [email, setEmail] = useState('');
@@ -14,6 +15,7 @@ export default function VerifyEmailPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { state } = useLocation();
+  const { verifyEmail } = useAuth();
 
   useEffect(() => {
     const s: any = state || {};
@@ -22,11 +24,19 @@ export default function VerifyEmailPage() {
 
   const handleVerify = async () => {
     setLoading(true);
-    const res = await authService.verifyEmail(email, token);
+    const res = await verifyEmail(email, token);
     setLoading(false);
     if (res.success) {
-      toast({ title: 'Email verified', description: 'You can now sign in.' });
-      navigate('/login');
+      toast({ title: 'Email verified', description: 'Your account is now active.' });
+      
+      // Handle onboarding redirection
+      if (res.onboardingStep === 'profile') {
+        navigate('/startup/create-profile');
+      } else if (res.onboardingStep === 'plan') {
+        navigate('/startup/select-plan');
+      } else {
+        navigate('/login'); // Fallback or student dashboard if we added logic for it
+      }
     } else {
       toast({ title: 'Verification failed', description: res.error || 'Invalid code or expired.', variant: 'destructive' });
     }

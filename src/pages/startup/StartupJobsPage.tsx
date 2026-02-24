@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Briefcase, Users, Search, Eye, Plus, MoreVertical } from "lucide-react";
+import { Briefcase, Users, Search, Eye, Plus, MoreVertical, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,97 +14,128 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { StartupLayout } from "@/components/layouts/StartupLayout";
 import { CreateJobModal } from "@/components/startup/CreateJobModal";
-
-/* ---------------- TYPES ---------------- */
-
-interface Job {
-  id: number;
-  title: string;
-  description: string;
-  experienceRequired: string;
-  educationRequired: string;
-  skillsRequired: string[];
-  applicantsCount: number;
-  postedOn: string;
-  status: "Open" | "Closed";
-}
-
-/* ---------------- MOCK DATA ---------------- */
-
-const hardcodedJobs: Job[] = [
-  {
-    id: 101,
-    title: "Frontend Developer",
-    description: "Looking for a React developer with strong UI skills.",
-    experienceRequired: "1-3 years",
-    educationRequired: "B.E / B.Tech",
-    skillsRequired: ["React", "JavaScript", "CSS"],
-    applicantsCount: 5,
-    postedOn: "2025-01-10",
-    status: "Open",
-  },
-  {
-    id: 102,
-    title: "Backend Engineer",
-    description: "Node.js developer needed for API development.",
-    experienceRequired: "2-4 years",
-    educationRequired: "B.Tech / MCA",
-    skillsRequired: ["Node.js", "MongoDB", "Express"],
-    applicantsCount: 3,
-    postedOn: "2025-01-12",
-    status: "Open",
-  },
-  {
-    id: 103,
-    title: "UI/UX Designer",
-    description: "Creative designer for web and mobile interfaces.",
-    experienceRequired: "1-2 years",
-    educationRequired: "Any degree",
-    skillsRequired: ["Figma", "Adobe XD", "Prototyping"],
-    applicantsCount: 8,
-    postedOn: "2025-01-08",
-    status: "Closed",
-  },
-];
-
-/* ---------------- COMPONENT ---------------- */
+import { jobService, Job } from "@/services/jobService";
+import { startupProfileService } from "@/services/startupProfileService";
+import { applicationService, Application } from "@/services/applicationService";
+import { formatDistanceToNow } from "date-fns";
+import { usePlanAccess } from "@/hooks/usePlanAccess";
+import { UpgradeModal } from "@/components/UpgradeModal";
 
 export default function StartupJobsPage() {
+  const { 
+    hasAccess, 
+    getFeatureValue, 
+    isUpgradeModalOpen, 
+    closeUpgradeModal, 
+    checkAccessAndShowModal,
+    triggeredFeature 
+  } = usePlanAccess();
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [profileId, setProfileId] = useState<string | null>(null);
 
-  useEffect(() => {
-    // Load from localStorage or use mock data
-    const stored = localStorage.getItem("startup_jobs_list");
-    if (stored) {
-      setJobs(JSON.parse(stored));
-    } else {
-      setJobs(hardcodedJobs);
-      localStorage.setItem("startup_jobs_list", JSON.stringify(hardcodedJobs));
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      // 1. Get Profile ID
+      const profileRes = await startupProfileService.getMyProfile();
+      let currentProfileId = null;
+      if (profileRes.success && profileRes.data) {
+        setProfileId(profileRes.data._id);
+        currentProfileId = profileRes.data._id;
+      }
+
+      if (currentProfileId) {
+          // 2. Get Jobs
+          const jobsRes = await jobService.getAllJobs();
+          let myJobs: Job[] = [];
+          if (jobsRes.success && jobsRes.data) {
+             myJobs = jobsRes.data.filter(job => {
+                if (typeof job.startupId === 'object' && job.startupId !== null) {
+                    return job.startupId._id === currentProfileId;
+                }
+                return job.startupId === currentProfileId;
+            });
+            setJobs(myJobs);
+          }
+
+          // 3. Get Applications (for counts)
+          const appsRes = await applicationService.getAllApplications();
+          if (appsRes.success && appsRes.data) {
+             const myApps = appsRes.data.filter(app => {
+                 const appJobId = typeof app.jobId === 'object' ? app.jobId._id : app.jobId;
+                 return myJobs.some(job => job._id === appJobId);
+             });
+             setApplications(myApps);
+          }
+      }
+    } catch (error) {
+      console.error("Error fetching jobs:", error);
+      toast({ title: "Error", description: "Failed to load jobs", variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
-  }, []);
-
-  const toggleJobStatus = (jobId: number) => {
-    const updatedJobs: Job[] = jobs.map((job) =>
-      job.id === jobId
-        ? { ...job, status: (job.status === "Open" ? "Closed" : "Open") as "Open" | "Closed" }
-        : job
-    );
-    setJobs(updatedJobs);
-    localStorage.setItem("startup_jobs_list", JSON.stringify(updatedJobs));
-    toast({
-      title: "Job Status Updated",
-      description: "Job position status changed.",
-    });
   };
 
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  // Filter Logic
   const filteredJobs = jobs.filter((job) =>
-    job.title.toLowerCase().includes(searchQuery.toLowerCase())
+    job.role.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const openJobs = jobs.filter((j) => j.status === "Open").length;
-  const totalApplicants = jobs.reduce((sum, j) => sum + j.applicantsCount, 0);
+  const openJobsCount = jobs.length; // Assuming all jobs fetched are "active" unless we have a status field? Model has deadline.
+  // Actually the job schema doesn't have a specific "status" field, but the UI had "Open/Closed".
+  // We'll assume all existing jobs are Open for now, or use deadline logic.
+  
+  const totalApplicants = applications.length;
+
+  const getApplicantCount = (jobId: string) => {
+      return applications.filter(a => {
+           const aJobId = typeof a.jobId === 'object' ? a.jobId._id : a.jobId;
+           return aJobId === jobId;
+      }).length;
+  };
+
+  const handleOpenCreateModal = () => {
+    const limit = getFeatureValue("maxActiveJobs") as number;
+    // Ensure limit is a valid number (loaded) before blocking
+    if (typeof limit === 'number' && jobs.length >= limit) {
+      checkAccessAndShowModal("maxActiveJobs", "Multiple Active Jobs");
+      return;
+    }
+    setCreateModalOpen(true);
+  };
+
+  // Helper to delete job
+  const handleDeleteJob = async (id: string, e: React.MouseEvent) => {
+      e.preventDefault(); // prevent navigation
+      if(!confirm("Are you sure you want to delete this job?")) return;
+
+      const res = await jobService.deleteJob(id);
+      if(res.success) {
+          toast({ title: "Job Deleted", description: "Job removed successfully." });
+          fetchData(); 
+      } else {
+          toast({ title: "Error", description: res.error || "Failed to delete" , variant:"destructive"});
+      }
+  };
+
+  if (loading) {
+       return (
+          <StartupLayout>
+              <div className="flex bg-background h-[calc(100vh-4rem)] items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+          </StartupLayout>
+      )
+  }
 
   return (
     <StartupLayout>
@@ -117,7 +148,7 @@ export default function StartupJobsPage() {
               Job Posts
             </h1>
             <p className="text-muted-foreground mt-1">
-              {openJobs} open positions • {totalApplicants} total applicants
+              {openJobsCount} active positions • {totalApplicants} total applicants
             </p>
           </div>
 
@@ -126,12 +157,12 @@ export default function StartupJobsPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 className="pl-10"
-                placeholder="Search jobs..."
+                placeholder="Search roles..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Button onClick={() => setCreateModalOpen(true)} className="bg-accent text-accent-foreground hover:bg-accent/90">
+            <Button onClick={handleOpenCreateModal} className="bg-accent text-accent-foreground hover:bg-accent/90">
               <Plus className="h-4 w-4 mr-2" />
               Post Job
             </Button>
@@ -157,8 +188,8 @@ export default function StartupJobsPage() {
                 <Briefcase className="h-5 w-5 text-success" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Open Positions</p>
-                <p className="text-2xl font-bold">{openJobs}</p>
+                <p className="text-sm text-muted-foreground">Active</p>
+                <p className="text-2xl font-bold">{openJobsCount}</p>
               </div>
             </div>
           </Card>
@@ -178,10 +209,10 @@ export default function StartupJobsPage() {
         {/* JOB CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredJobs.map((job) => (
-            <Card key={job.id} className="hover:shadow-lg transition-shadow">
+            <Card key={job._id} className="hover:shadow-lg transition-shadow bg-card">
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
-                  <CardTitle className="text-lg">{job.title}</CardTitle>
+                  <CardTitle className="text-lg">{job.role}</CardTitle>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -189,11 +220,7 @@ export default function StartupJobsPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="bg-popover border-border z-50">
-                      <DropdownMenuItem onClick={() => toggleJobStatus(job.id)}>
-                        {job.status === "Open" ? "Close Position" : "Reopen Position"}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>Edit Job</DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive">Delete Job</DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => handleDeleteJob(job._id, e as any)} className="text-destructive">Delete Job</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -201,33 +228,23 @@ export default function StartupJobsPage() {
 
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground line-clamp-2">
-                  {job.description}
+                  {job.aboutRole}
                 </p>
 
+                {/* Show badges for requirements if possible, else just generic tags */}
                 <div className="flex flex-wrap gap-1.5">
-                  {job.skillsRequired.slice(0, 3).map((skill) => (
-                    <Badge key={skill} variant="secondary" className="text-xs">
-                      {skill}
-                    </Badge>
-                  ))}
-                  {job.skillsRequired.length > 3 && (
-                    <Badge variant="outline" className="text-xs">
-                      +{job.skillsRequired.length - 3}
-                    </Badge>
-                  )}
+                   {job.requirements && <Badge variant="secondary" className="text-xs truncate max-w-full">{job.requirements.substring(0, 30)}...</Badge>}
                 </div>
 
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Users className="h-4 w-4" />
-                    {job.applicantsCount} Applicants
+                    {getApplicantCount(job._id)} Applicants
                   </div>
                   <Badge
-                    variant={job.status === "Open" ? "accent" : "muted"}
-                    className="cursor-pointer"
-                    onClick={() => toggleJobStatus(job.id)}
+                    variant="accent"
                   >
-                    {job.status}
+                    Active
                   </Badge>
                 </div>
 
@@ -236,15 +253,17 @@ export default function StartupJobsPage() {
                     variant="outline"
                     size="sm"
                     className="flex-1"
-                    disabled={job.status === "Closed"}
                     asChild
                   >
-                    <Link to={`/startup/jobs/${job.id}/applications`}>
+                    <Link to={`/startup/jobs/${job._id}/applications`}>
                       <Eye className="h-4 w-4 mr-2" />
                       View Applications
                     </Link>
                   </Button>
                 </div>
+                 <div className="text-xs text-muted-foreground text-center">
+                    Posted {formatDistanceToNow(new Date(job.createdAt || Date.now()), { addSuffix: true })}
+                 </div>
               </CardContent>
             </Card>
           ))}
@@ -258,7 +277,8 @@ export default function StartupJobsPage() {
         )}
 
         {/* Create Job Modal */}
-        <CreateJobModal open={createModalOpen} onOpenChange={setCreateModalOpen} />
+        <CreateJobModal open={createModalOpen} onOpenChange={setCreateModalOpen} onJobCreated={fetchData} />
+        <UpgradeModal isOpen={isUpgradeModalOpen} onClose={closeUpgradeModal} featureName={triggeredFeature} />
       </div>
     </StartupLayout>
   );

@@ -10,14 +10,14 @@ import {
 } from "@/components/ui/select";
 import { FileText } from "lucide-react";
 
-export type EmailTemplate = "interview_invite" | "rejection" | "general_update" | "custom";
+export type EmailTemplate = "interview" | "rejected" | "selected" | "shortlisted" | "general_update" | "custom";
 
 interface EmailTemplateSelectorProps {
   onSelect: (template: EmailTemplate, subject: string, body: string) => void;
 }
 
 const templates: Record<EmailTemplate, { subject: string; body: string; label: string }> = {
-  interview_invite: {
+  interview: {
     label: "Interview Invitation",
     subject: "Interview Invitation - [Company Name]",
     body: `Dear [Candidate Name],
@@ -35,7 +35,33 @@ Please confirm your availability by replying to this email.
 Best regards,
 [Company Name] Hiring Team`,
   },
-  rejection: {
+  shortlisted: {
+    label: "Shortlisted Notice",
+    subject: "Application Status: Shortlisted - [Company Name]",
+    body: `Dear [Candidate Name],
+
+We are pleased to inform you that your application for the [Position] role at [Company Name] has been shortlisted.
+
+We were impressed with your profile and would like to proceed with the next steps of our hiring process. We will be in touch shortly with more details.
+
+Best regards,
+[Company Name] Hiring Team`,
+  },
+  selected: {
+    label: "Selection / Offer",
+    subject: "Congratulations! Job Offer for [Position] at [Company Name]",
+    body: `Dear [Candidate Name],
+
+Congratulations! We are thrilled to offer you the [Position] role at [Company Name].
+
+We were very impressed with your skills and experience during the interview process. Please find the attached offer letter (or see details below).
+
+We look forward to welcoming you to the team!
+
+Best regards,
+[Company Name] Hiring Team`,
+  },
+  rejected: {
     label: "Rejection Notice",
     subject: "Application Update - [Company Name]",
     body: `Dear [Candidate Name],

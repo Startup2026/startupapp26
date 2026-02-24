@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Heart,
   MessageCircle,
@@ -7,23 +7,37 @@ import {
   MoreHorizontal,
   Calendar,
   ExternalLink,
-  Send,
+  Edit,
   Trash2,
-  User,
   Search,
-  X
+  X,
+  Send,
+  User,
+  Loader2
 } from "lucide-react";
+import { API_BASE_URL } from "@/lib/api";
+import { CreatePostModal } from "@/components/startup/CreatePostModal";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { StudentLayout } from "@/components/layouts/StudentLayout";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Textarea as UiTextarea } from "@/components/ui/textarea";
+
+// Remove this debug log
+// console.log("Textarea imported:", UiTextarea);
+
 import { apiFetch, getStoredUser } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
@@ -49,11 +63,14 @@ interface FeedPost {
   type: "update" | "event" | "promotion";
   company: string;
   companyLogo: string;
+  companyAvatar?: string;
   verified: boolean;
   postedAt: string;
   title: string;
   content: string;
   image?: string;
+  video?: string;
+  startupUserId?: string;
   link?: string;
   eventDate?: string;
   eventLocation?: string;
@@ -94,11 +111,22 @@ const formatTimeAgo = (dateString: string) => {
 
 export default function StartupFeedPage() {
   const [posts, setPosts] = useState<FeedPost[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const user = getStoredUser();
+  const BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 
   const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
+  
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const observerTarget = useRef(null);
+  
+  // Edit Post State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [postToEdit, setPostToEdit] = useState<FeedPost | null>(null);
   const [commentText, setCommentText] = useState("");
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
@@ -109,28 +137,64 @@ export default function StartupFeedPage() {
     const fetchFeed = async () => {
       setLoading(true);
       try {
-        let endpoint = "/recommendations/cold-start/posts?limit=20";
+        let endpoint = `/recommendations/cold-start/posts?limit=5&page=${page}`;
         if (user?._id) {
-          endpoint = `/recommendations/posts/${user._id}?limit=20&random=true`;
+          endpoint = `/recommendations/posts/${user._id}?limit=5&page=${page}&random=true`;
         }
 
         const res = await apiFetch(endpoint);
 
         if (res.success && Array.isArray(res.data)) {
           const transformedData = res.data.map((item: any) => transformFeedItem(item));
-          setPosts(transformedData);
+          if (transformedData.length === 0) {
+            setHasMore(false);
+          } else {
+            setPosts(prev => {
+                const newPosts = page === 1 ? transformedData : [...prev, ...transformedData];
+                // Use a Map to ensure uniqueness by ID
+                const uniquePostsMap = new Map<string, FeedPost>();
+                newPosts.forEach(post => {
+                  if (post.id) uniquePostsMap.set(post.id, post);
+                });
+                return Array.from(uniquePostsMap.values());
+            });
+          }
         } else {
           console.error("Failed to load feed:", res.message);
+          setHasMore(false);
         }
       } catch (error) {
         console.error("Error fetching feed:", error);
       } finally {
         setLoading(false);
+        setIsInitialLoading(false);
       }
     };
 
     fetchFeed();
-  }, [user?._id]);
+  }, [page, user?._id]);
+
+  // Infinite Scroll Observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && hasMore && !loading) {
+          setPage(prev => prev + 1);
+        }
+      },
+      { threshold: 1.0 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => {
+      if (observerTarget.current) {
+        observer.unobserve(observerTarget.current);
+      }
+    };
+  }, [hasMore, loading]);
 
   // --- Transform Data ---
   const transformFeedItem = (item: any): FeedPost => {
@@ -145,9 +209,12 @@ export default function StartupFeedPage() {
       type: postType,
       company: item.startupid?.startupName || "Startup",
       companyLogo: (item.startupid?.startupName || "S").charAt(0).toUpperCase(),
+      companyAvatar: item.startupid?.profilepic ? `${BASE_URL}${item.startupid.profilepic}` : undefined,
       verified: item.startupid?.verified || false,
       postedAt: formatTimeAgo(item.createdAt),
       title: item.title || "New Update",
+      video: item.media?.video || undefined,
+      startupUserId: item.startupid?.userId,
       content: item.description || "",
       image: item.media?.photo || undefined,
       link: item.link,
@@ -348,6 +415,31 @@ export default function StartupFeedPage() {
       toast({ title: "Error", description: "Could not delete comment", variant: "destructive" });
     }
   };
+  
+  const handleEdit = (post: FeedPost) => {
+    setPostToEdit(post);
+    setIsEditModalOpen(true);
+  };
+
+  const handleDelete = async (post: FeedPost) => {
+    if (!user?._id) return;
+    try {
+      const res = await apiFetch("/posts/delete-post/" + post.id, { method: "DELETE" });
+      if (res.status === 401) {
+        handleAuthError();
+        return;
+      }
+      if (res.success) {
+        setPosts(posts.filter(p => p.id !== post.id));
+        toast({ title: "Post deleted" });
+      } else {
+        throw new Error(res.error || "Failed to delete");
+      }
+    } catch (err) {
+       console.error(err);
+       toast({ title: "Error", description: "Could not delete post", variant: "destructive" });
+    }
+  };
 
   const filteredPosts = posts.filter((post) => {
     const query = searchQuery.toLowerCase();
@@ -392,11 +484,10 @@ export default function StartupFeedPage() {
           </div>
 
           <div className="space-y-6">
-            {loading ? (
+            {isInitialLoading ? (
               Array.from({ length: 3 }).map((_, i) => (
-                <Card key={i} className="overflow-hidden">
-                  <CardHeader className="pb-3"><div className="h-12 w-full bg-accent/10 animate-pulse rounded-lg" /></CardHeader>
-                  <CardContent><div className="h-24 bg-accent/5 animate-pulse rounded-lg" /></CardContent>
+                <Card key={i} className="animate-pulse">
+                  <CardContent className="h-48" />
                 </Card>
               ))
             ) : filteredPosts.length > 0 ? (
@@ -405,9 +496,12 @@ export default function StartupFeedPage() {
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="h-12 w-12 rounded-xl bg-accent/10 flex items-center justify-center font-bold text-accent text-xl flex-shrink-0 select-none">
-                          {post.companyLogo}
-                        </div>
+                        <Avatar className="h-12 w-12 rounded-xl">
+                          <AvatarImage src={post.companyAvatar} alt={post.company} className="object-cover" />
+                          <AvatarFallback className="bg-accent/10 text-accent text-xl font-bold">
+                            {post.companyLogo}
+                          </AvatarFallback>
+                        </Avatar>
                         <div>
                           <div className="flex items-center gap-2">
                             <h3 className="font-semibold">{post.company}</h3>
@@ -420,9 +514,23 @@ export default function StartupFeedPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         {getTypeBadge(post.type)}
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
+                        {user?._id === post.startupUserId && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEdit(post)}>
+                                <Edit className="mr-2 h-4 w-4" /> Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDelete(post)} className="text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" /> Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </div>
                     </div>
                   </CardHeader>
@@ -450,12 +558,24 @@ export default function StartupFeedPage() {
                     {post.image && (
                       <div className="rounded-lg overflow-hidden border bg-muted/20">
                         <img
-                          src={post.image}
+                          src={`${BASE_URL}${post.image}`}
                           alt={post.title}
                           className="w-full h-auto max-h-[400px] object-cover"
                           onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                         />
                       </div>
+                    )}
+                    
+                    {post.video && (
+                       <div className="rounded-lg overflow-hidden border bg-black aspect-video relative">
+                          <video 
+                             controls
+                             className="w-full h-full"
+                             src={`${BASE_URL}${post.video}`}
+                          >
+                             Your browser does not support the video tag.
+                          </video>
+                       </div>
                     )}
 
                     {post.link && (
@@ -517,6 +637,7 @@ export default function StartupFeedPage() {
                 </Card>
               ))
             ) : (
+              !isInitialLoading && (
               <Card className="p-12 text-center border-dashed">
                 <div className="flex flex-col items-center justify-center gap-3">
                   <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
@@ -531,6 +652,18 @@ export default function StartupFeedPage() {
                   )}
                 </div>
               </Card>
+              )
+            )}
+            
+            {loading && hasMore && (
+               <div className="flex justify-center p-8 w-full">
+                  <Loader2 className="animate-spin h-6 w-6 text-primary" />
+               </div>
+            )}
+            
+            {!loading && hasMore && posts.length > 0 && (
+               <div ref={observerTarget} className="h-10 w-full flex justify-center p-4">
+               </div>
             )}
           </div>
         </div>
@@ -590,7 +723,7 @@ export default function StartupFeedPage() {
 
             <div className="p-4 border-t bg-background mt-auto">
               <div className="flex gap-2">
-                <Textarea 
+                <UiTextarea 
                   placeholder="Write a comment..." 
                   className="min-h-[40px] max-h-[100px] resize-none"
                   value={commentText}
@@ -609,6 +742,27 @@ export default function StartupFeedPage() {
           </DialogContent>
         </Dialog>
 
+      <CreatePostModal 
+        open={isEditModalOpen} 
+        onOpenChange={(open) => {
+          setIsEditModalOpen(open);
+          if (!open) setPostToEdit(null);
+        }}
+        onSuccess={() => {
+          // Refresh posts locally without reloading
+          setPage(1);
+          setPosts([]);
+          setHasMore(true);
+          setLoading(true);
+          // The useEffect will trigger automatically since page is reset or we can manually refetch if needed
+          // But resetting page to 1 will trigger the main useEffect
+        }}
+        initialData={postToEdit ? {
+          id: postToEdit.id,
+          title: postToEdit.title,
+          description: postToEdit.content
+        } : undefined}
+      />
       </div>
     </StudentLayout>
   );

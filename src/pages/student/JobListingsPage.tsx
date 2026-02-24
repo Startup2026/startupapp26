@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
-import { Search, MapPin, DollarSign, Building2, Clock, Filter, ChevronDown } from "lucide-react";
+import { Search, MapPin, DollarSign, Building2, Clock, Filter, ChevronDown, Loader2 } from "lucide-react";
 import { StudentLayout } from "@/components/layouts/StudentLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,13 @@ export default function JobListingsPage() {
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [jobs, setJobs] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const observerTarget = useRef(null);
 
   // This fetch triggers on page load/refresh
   useEffect(() => {
@@ -31,20 +37,51 @@ export default function JobListingsPage() {
       try {
         // Appending random=true triggers the shuffleArray logic in your RecommendationController
         const res = user?._id 
-          ? await jobService.getRecommendedJobs(user._id) 
-          : await jobService.getColdStartJobs();
+          ? await jobService.getRecommendedJobs(user._id, page) 
+          : await jobService.getColdStartJobs(page);
           
         if (res?.success) {
-          setJobs((res.data as any[]) || []);
+          const newJobs = (res.data as any[]) || [];
+          if (newJobs.length === 0) {
+             setHasMore(false);
+          } else {
+             setJobs(prev => {
+                const combined = page === 1 ? newJobs : [...prev, ...newJobs];
+                return Array.from(new Map(combined.map(j => [j._id, j])).values());
+             });
+          }
         }
       } catch (error) {
         console.error("Failed to load jobs:", error);
       } finally {
         setLoading(false);
+        setIsInitialLoading(false);
       }
     };
     fetchJobs();
-  }, []);
+  }, [page]);
+
+  // Infinite Scroll Observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && hasMore && !loading) {
+          setPage(prev => prev + 1);
+        }
+      },
+      { threshold: 1.0 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => {
+      if (observerTarget.current) {
+        observer.unobserve(observerTarget.current);
+      }
+    };
+  }, [hasMore, loading]);
 
   const filteredJobs = jobs.filter((job) => {
     const searchLower = searchQuery.toLowerCase();
@@ -121,7 +158,7 @@ export default function JobListingsPage() {
             </div>
 
             <div className="space-y-4">
-              {loading ? (
+              {filteredJobs.length === 0 && isInitialLoading ? (
                 Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-44 w-full rounded-xl" />)
               ) : filteredJobs.map((job) => (
                 <Link key={job._id} to={`/student/jobs/${job._id}`}>
@@ -163,6 +200,17 @@ export default function JobListingsPage() {
                   </Card>
                 </Link>
               ))}
+              
+              {loading && hasMore && (
+                  <div className="flex justify-center p-8">
+                     <Loader2 className="animate-spin h-8 w-8 text-primary" />
+                  </div>
+              )}
+              
+              {!loading && hasMore && (
+                 <div ref={observerTarget} className="h-10 w-full flex justify-center p-4"></div>
+              )}
+
             </div>
           </div>
         </div>

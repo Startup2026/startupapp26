@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Calendar, Mail, User, X } from "lucide-react";
+import { Calendar, Mail, User, X, Loader2, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,31 +7,32 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { StartupLayout } from "@/components/layouts/StartupLayout";
 import { toast } from "@/hooks/use-toast";
-
-// Select components
+import { startupProfileService } from "@/services/startupProfileService";
+import { jobService } from "@/services/jobService";
+import { selectionService } from "@/services/selectionService";
+import { Checkbox } from "@/components/ui/checkbox";
+import { applicationService } from "@/services/applicationService";
+import { interviewService } from "@/services/interviewService";
+import { format } from "date-fns";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
-// Clock icon
-import { Clock } from "lucide-react";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 /* ---------------- TYPES ---------------- */
 
 type ApplicantStatus =
-  | "Applied"
-  | "Shortlisted"
-  | "Interview Scheduled"
-  | "Selected"
-  | "Rejected";
+  | "APPLIED"
+  | "SHORTLISTED"
+  | "REJECTED"
+  | "HIRED";
 
 interface Applicant {
   id: string;
-  jobId: number;
+  jobId: string;
+  jobRole: string;
   name: string;
   email: string;
   role: string;
@@ -40,74 +41,18 @@ interface Applicant {
   experience: number;
   education: string;
   status: ApplicantStatus;
+  resumeUrl?: string;
 }
-
-interface Job {
-  id: number;
-  title: string;
-  applicants: Applicant[];
-}
-
-/* ---------------- HARDCODED JOBS ---------------- */
-
-const hardcodedJobs: Job[] = [
-  {
-    id: 101,
-    title: "Frontend Developer",
-    applicants: [
-      {
-        id: "1",
-        jobId: 101,
-        name: "Neha Patil",
-        email: "neha@gmail.com",
-        role: "Frontend Developer",
-        appliedOn: "2025-01-13",
-        skills: ["React", "Tailwind", "JavaScript"],
-        experience: 3,
-        education: "B.Tech IT",
-        status: "Shortlisted",
-      },
-      {
-        id: "2",
-        jobId: 101,
-        name: "Rohit Kumar",
-        email: "rohit@gmail.com",
-        role: "Frontend Developer",
-        appliedOn: "2025-01-14",
-        skills: ["React", "CSS", "JavaScript"],
-        experience: 2,
-        education: "B.E Computer Engineering",
-        status: "Applied",
-      },
-    ],
-  },
-  {
-    id: 102,
-    title: "Backend Developer",
-    applicants: [
-      {
-        id: "3",
-        jobId: 102,
-        name: "Priya Kulkarni",
-        email: "priya@gmail.com",
-        role: "Backend Developer",
-        appliedOn: "2025-01-15",
-        skills: ["Node.js", "Express", "MongoDB"],
-        experience: 3,
-        education: "B.E Computer Engineering",
-        status: "Shortlisted",
-      },
-    ],
-  },
-];
 
 /* ---------------- COMPONENT ---------------- */
 
 export default function Shortlisted() {
-  const [shortlisted, setShortlisted] = useState<Applicant[]>([]);
+  const [shortlistedApps, setShortlistedApps] = useState<Applicant[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  // State for modal
+  // States for modals
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [schedule, setSchedule] = useState({
     applicationId: "",
@@ -120,82 +65,221 @@ export default function Shortlisted() {
     notes: "",
   });
 
-  /* -------- LOAD SHORTLISTED CANDIDATES -------- */
-  useEffect(() => {
-    const result: Applicant[] = [];
-    hardcodedJobs.forEach((job) => {
-      job.applicants.forEach((applicant) => {
-        if (applicant.status === "Shortlisted") {
-          result.push(applicant);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [emailData, setEmailData] = useState({
+    subject: "Shortlisted for Interview",
+    message: "Congratulations! You have been shortlisted for the interview round. We will share the schedule shortly.",
+  });
+
+  const fetchData = async () => {
+    try {
+        setLoading(true);
+        const profileRes = await startupProfileService.getMyProfile();
+        if (!profileRes.success || !profileRes.data) {
+            setLoading(false);
+            return;
         }
-      });
-    });
-    setShortlisted(result);
+        const profileId = profileRes.data._id;
+
+        const jobsRes = await jobService.getAllJobs();
+        if (!jobsRes.success || !jobsRes.data) {
+            setLoading(false);
+            return;
+        }
+
+        // Filter my jobs
+        const myJobs = jobsRes.data.filter(job => {
+            const jSid = (job.startupId && typeof job.startupId === 'object') ? job.startupId._id : job.startupId;
+            return jSid === profileId;
+        });
+
+        // Get all applications
+        const appRes = await applicationService.getAllApplications();
+        if (appRes.success && appRes.data) {
+            // Filter apps for my jobs AND status SHORTLISTED
+            const relevantApps = appRes.data.filter(app => {
+                if (!app.jobId) return false;
+                const appId = (typeof app.jobId === 'object') ? app.jobId._id : app.jobId;
+                const matchesJob = myJobs.some(j => j._id === appId);
+                return matchesJob && app.status === 'SHORTLISTED';
+            });
+
+            // Map to UI model
+            const cleanApps: Applicant[] = relevantApps.map(app => {
+                const student = app.studentId as any; 
+                const job = typeof app.jobId === 'object' ? app.jobId : myJobs.find(j => j._id === app.jobId);
+
+                return {
+                    id: app._id,
+                    jobId: job?._id || "",
+                    jobRole: (job as any)?.role || "Unknown Role",
+                    name: student ? `${student.firstName || student.firstname} ${student.lastName || student.lastname}` : "Unknown",
+                    email: student?.email || "",
+                    role: (job as any)?.role || "Unknown Role",
+                    appliedOn: app.createdAt ? format(new Date(app.createdAt), "yyyy-MM-dd") : "N/A",
+                    skills: student?.skills || [],
+                    experience: (student?.experience || []).length || 0,
+                    education: student?.education?.[0]?.degree || "N/A",
+                    status: app.status as ApplicantStatus,
+                    resumeUrl: app.resumeUrl || student?.resumeUrl || null
+                };
+            });
+            
+            setShortlistedApps(cleanApps);
+        }
+    } catch (err) {
+        console.error(err);
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
   }, []);
+
+  /* ---------------- HANDLERS ---------------- */
 
   const openScheduleModal = (applicant: Applicant) => {
     setSchedule({
       ...schedule,
       applicationId: applicant.id,
-      candidateName: applicant.name, // set name
+      candidateName: applicant.name, 
     });
     setIsModalOpen(true);
   };
 
-  // Email modal state
-  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
-  const [emailData, setEmailData] = useState({
-    to: "",
-    subject: "",
-    message: "",
-  });
+  const scheduleInterview = async () => {
+    if (!schedule.date || !schedule.time) {
+      toast({ title: "Validation Error", description: "Please provide both date and time", variant: "destructive" });
+      return;
+    }
 
-  const scheduleInterview = () => {
-    toast({
-      title: "Interview Scheduled",
-      description: "Interview email has been sent to the candidate.",
-    });
-    setSchedule({
-      applicationId: "",
-      candidateName: "",
-      date: "",
-      time: "",
-      mode: "Online",
-      link: "",
-      interviewer: "",
-      notes: "",
-    });
-    setIsModalOpen(false);
+    try {
+      const res = await interviewService.scheduleInterview(schedule.applicationId, {
+        interviewDate: schedule.date,
+        interviewTime: schedule.time,
+        mode: schedule.mode,
+        interviewLink: schedule.link,
+        interviewer: schedule.interviewer,
+        notes: schedule.notes
+      });
+
+      if (res.success || res.message === "Interview Scheduled!!!") {
+        toast({
+          title: "Interview Scheduled",
+          description: `Interview scheduled with ${schedule.candidateName} on ${schedule.date} at ${schedule.time}`,
+        });
+        setSchedule({
+          applicationId: "",
+          candidateName: "",
+          date: "",
+          time: "",
+          mode: "Online",
+          link: "",
+          interviewer: "",
+          notes: "",
+        });
+        setIsModalOpen(false);
+        // Refresh data to reflect status change
+        fetchData(); 
+      } else {
+        toast({ title: "Error", description: res.error || "Failed to schedule interview", variant: "destructive" });
+      }
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Error", description: "Something went wrong", variant: "destructive" });
+    }
   };
 
-  const handleSendEmail = (applicant: Applicant) => {
-    setEmailData({
-      to: applicant.email, // auto-fill candidate email
-      subject: "",
-      message: "",
-    });
-    setIsEmailModalOpen(true);
+  const handleBulkEmail = () => {
+     // Keep existing template or reset if empty. 
+     // For now, ensuring it opens with the template is enough.
+     setIsEmailModalOpen(true);
+  };
+
+  const sendEmail = async () => {
+    try {
+        const res = await selectionService.notifyShortlisted({
+            subject: emailData.subject,
+            message: emailData.message,
+            applicationIdList: selectedIds
+        });
+
+        if (res.success) {
+            toast({
+                title: "Bulk Email Sent",
+                description: `Emails sent to ${selectedIds.length} candidates.`,
+            });
+            setIsEmailModalOpen(false);
+            setSelectedIds([]);
+        } else {
+             toast({ title: "Error", description: "Failed to send emails", variant: "destructive" });
+        }
+    } catch (e) {
+        toast({ title: "Error", description: "Something went wrong", variant: "destructive" });
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id)
+        ? prev.filter((x) => x !== id)
+        : [...prev, id]
+    );
+  };
+
+  const removeCandidate = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click if any
+    try {
+        const res = await applicationService.updateApplication(id, { status: "APPLIED" });
+        if(res.success){
+             setShortlistedApps((prev) => prev.filter((app) => app.id !== id));
+             toast({ title: "Removed from Shortlist", description: "Candidate status reset to Applied." });
+        } else {
+            toast({ title: "Error", description: "Failed to update status", variant: "destructive"});
+        }
+    } catch(err) {
+        toast({ title: "Error", description: "An error occurred", variant: "destructive"});
+    }
   };
 
   /* -------- FILTERED CANDIDATES -------- */
-  const filtered = shortlisted.filter(
+  const filtered = shortlistedApps.filter(
     (c) =>
       c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.email.toLowerCase().includes(searchQuery.toLowerCase()),
+      c.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  if (loading) {
+      return (
+          <StartupLayout>
+              <div className="flex bg-background h-[calc(100vh-4rem)] items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+          </StartupLayout>
+      )
+  }
 
   return (
     <StartupLayout>
       <div className="p-6 space-y-6">
-        {/* HEADER */}
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Shortlisted Candidates</h1>
-          <Input
-            placeholder="Search by name or email..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-80 pl-10"
-          />
+        <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+            <div>
+                 <h1 className="text-3xl font-bold">Shortlisted Candidates</h1>
+                 <p className="text-muted-foreground">{shortlistedApps.length} Candidates</p>
+            </div>
+            <div className="flex gap-2">
+                 <Button disabled={selectedIds.length === 0} onClick={handleBulkEmail}>
+                    <Mail className="h-4 w-4 mr-2"/> Send Bulk Email ({selectedIds.length})
+                 </Button>
+                <Input
+                    placeholder="Search by name or email..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-64"
+                />
+          </div>
         </div>
 
         {/* CANDIDATE CARDS */}
@@ -206,35 +290,61 @@ export default function Shortlisted() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filtered.map((c) => (
-              <Card key={c.id}>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5" />
-                    {c.name}
-                  </CardTitle>
+              <Card key={c.id} className={selectedIds.includes(c.id) ? "border-primary border-2" : ""}>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                        checked={selectedIds.includes(c.id)}
+                        onCheckedChange={() => toggleSelect(c.id)}
+                    />
+                    <CardTitle className="text-lg font-bold flex items-center gap-2 cursor-pointer" onClick={() => toggleSelect(c.id)}>
+                        <User className="h-5 w-5" />
+                        {c.name}
+                    </CardTitle>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    onClick={(e) => removeCandidate(c.id, e)}
+                    title="Remove from shortlist"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </CardHeader>
-                <CardContent className="space-y-1 text-sm">
-                  <p>Email: {c.email}</p>
-                  <p>Role: {c.role}</p>
+                <CardContent className="space-y-4">
+                  <div className="text-sm text-muted-foreground">
+                      <p className="font-medium text-foreground">{c.jobRole}</p>
+                      <User className="h-3 w-3 inline mr-1"/> {c.experience}y exp • {c.education}
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-1">
+                      {c.skills.slice(0,3).map(skill => (
+                          <span key={skill} className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded-md">{skill}</span>
+                      ))}
+                  </div>
 
                   {/* Buttons inside each card */}
-                  <div className="flex gap-5 pt-2">
+                  <div className="flex gap-2 pt-2">
+                    {c.resumeUrl && (
+                      <Button variant="outline" size="sm" className="flex-1 text-xs border-teal-500 text-teal-600 hover:bg-teal-50" asChild>
+                         <a 
+                          href={c.resumeUrl.startsWith('http') ? c.resumeUrl : `http://localhost:3000${c.resumeUrl}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                        >
+                          <FileText className="h-3 w-3 mr-1"/>
+                          Resume
+                        </a>
+                      </Button>
+                    )}
                     <Button
                       size="sm"
-                      className="bg-teal-500 hover:bg-teal-600 text-white flex items-center gap-1"
+                      className="bg-teal-500 hover:bg-teal-600 text-white flex-1 text-xs"
                       onClick={() => openScheduleModal(c)}
                     >
-                      <Calendar className="h-4 w-4" />
+                      <Calendar className="h-3 w-3 mr-1" />
                       Schedule Interview
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex items-center gap-1"
-                      onClick={() => handleSendEmail(c)}
-                    >
-                      <Mail className="h-4 w-4" />
-                      Send Email
                     </Button>
                   </div>
                 </CardContent>
@@ -257,14 +367,13 @@ export default function Shortlisted() {
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
                     <button
-                      onClick={() => setIsModalOpen(false)}
-                      className="absolute top-3 right-3 border-2 border-teal-500 text-teal-500 rounded-full p-1 flex items-center justify-center hover:bg-teal-50 focus:outline-none"
+                        onClick={() => setIsModalOpen(false)}
+                        className="absolute top-3 right-3 border-2 border-teal-500 text-teal-500 rounded-full p-1 flex items-center justify-center hover:bg-teal-50 focus:outline-none"
                     >
-                      <X className="h-5 w-5" />
+                        <X className="h-5 w-5" />
                     </button>
 
                     <Label>Candidate</Label>
-
                     <Input value={schedule.candidateName} disabled />
                   </div>
 
@@ -303,125 +412,65 @@ export default function Shortlisted() {
                       }
                     />
                   </div>
-
-                  <div className="md:col-span-2">
-                    <Label>Interview Link / Location</Label>
-                    <Input
-                      placeholder="Google Meet / Office address"
-                      value={schedule.link}
-                      onChange={(e) =>
-                        setSchedule({ ...schedule, link: e.target.value })
-                      }
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <Label>Interviewer</Label>
-                    <Input
-                      placeholder="Name of interviewer"
-                      value={schedule.interviewer}
-                      onChange={(e) =>
-                        setSchedule({
-                          ...schedule,
-                          interviewer: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <Label>Notes</Label>
-                    <Textarea
-                      placeholder="Additional instructions"
-                      value={schedule.notes}
-                      onChange={(e) =>
-                        setSchedule({ ...schedule, notes: e.target.value })
-                      }
-                    />
-                  </div>
+                  
+                  {schedule.mode === "Online" && (
+                    <div className="md:col-span-2">
+                        <Label>Meeting Link</Label>
+                        <Input
+                          placeholder="https://zoom.us/..."
+                          value={schedule.link}
+                          onChange={(e) =>
+                            setSchedule({ ...schedule, link: e.target.value })
+                          }
+                        />
+                    </div>
+                  )}
                 </div>
-
-                <Button
-                  className="w-full mt-4"
-                  onClick={scheduleInterview}
-                  disabled={
-                    !schedule.applicationId || !schedule.date || !schedule.time
-                  }
-                >
-                  <Clock className="h-4 w-4 mr-2" />
-                  Schedule Interview
-                </Button>
+                
+                <div className="flex justify-end gap-2 mt-4">
+                   <Button variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+                   <Button onClick={scheduleInterview}>Schedule</Button>
+                </div>
               </CardContent>
             </Card>
           </div>
         )}
 
-        {/* -------- SEND EMAIL MODAL -------- */}
+        {/* -------- EMAIL MODAL -------- */}
         {isEmailModalOpen && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <Card className="w-full max-w-xl relative">
-              {/* Close Button */}
-              <button
-                onClick={() => setIsEmailModalOpen(false)}
-                className="absolute top-2 right-2 border-2 border-teal-500 text-teal-500 rounded-full p-2 hover:bg-teal-50"
-              >
-                <X className="h-5 w-5" />
-              </button>
-
+            <Card className="w-full max-w-md">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Mail className="h-6 w-6 text-teal-500" />
-                  Send Email
-                </CardTitle>
+                <CardTitle>Send Email to {selectedIds.length} Candidates</CardTitle>
               </CardHeader>
-
               <CardContent className="space-y-4">
-                {/* To */}
-                <div>
-                  <Label>To</Label>
-                  <Input value={emailData.to} disabled />
-                </div>
-
-                {/* Subject */}
                 <div>
                   <Label>Subject</Label>
                   <Input
-                    placeholder="Interview Invitation"
                     value={emailData.subject}
                     onChange={(e) =>
                       setEmailData({ ...emailData, subject: e.target.value })
                     }
                   />
                 </div>
-
-                {/* Message */}
                 <div>
                   <Label>Message</Label>
                   <Textarea
-                    placeholder="Email message..."
-                    rows={6}
                     value={emailData.message}
                     onChange={(e) =>
                       setEmailData({ ...emailData, message: e.target.value })
                     }
                   />
                 </div>
-
-                {/* Send Button */}
-                <Button
-                  className="w-full bg-teal-500 hover:bg-teal-600"
-                  disabled={!emailData.subject || !emailData.message}
-                  onClick={() => {
-                    toast({
-                      title: "Email Sent",
-                      description: `Email sent to ${emailData.to}`,
-                    });
-                    setIsEmailModalOpen(false);
-                  }}
-                >
-                  <Mail className="h-4 w-4 mr-2" />
-                  Send Email
-                </Button>
+                <div className="flex justify-end gap-2 mt-4">
+                  <Button
+                    variant="ghost"
+                    onClick={() => setIsEmailModalOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={sendEmail}>Send</Button>
+                </div>
               </CardContent>
             </Card>
           </div>
