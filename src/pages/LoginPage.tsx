@@ -134,9 +134,10 @@ export default function LoginPage() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password">Password</Label>
                 <button
                   type="button"
+                  onClick={() => navigate("/forgot-password")}
                   className="text-sm text-accent hover:text-accent/80 transition-colors"
                 >
                   Forgot password?

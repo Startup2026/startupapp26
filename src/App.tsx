@@ -44,6 +44,8 @@ import PostDetailPage from "./pages/startup/PostDetailPage";
 import StartupNotificationsPage from "./pages/startup/StartupNotificationsPage";
 import TrendingJobsPage from "./pages/student/TrendingJobsPost";
 import SavedItemsPage from "./pages/student/SavePage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -58,6 +60,8 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/verify-pending" element={<VerifyPendingPage />} />
             
