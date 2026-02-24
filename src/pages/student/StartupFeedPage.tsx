@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Heart,
   MessageCircle,
@@ -11,7 +11,9 @@ import {
   Trash2,
   Search,
   X,
-  Send
+  Send,
+  User,
+  Loader2
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api";
 import { CreatePostModal } from "@/components/startup/CreatePostModal";
@@ -27,6 +29,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
+import { Textarea as UiTextarea } from "@/components/ui/textarea";
+
+// Remove this debug log
+// console.log("Textarea imported:", UiTextarea);
+
 import { apiFetch, getStoredUser } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -104,12 +111,18 @@ const formatTimeAgo = (dateString: string) => {
 
 export default function StartupFeedPage() {
   const [posts, setPosts] = useState<FeedPost[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const user = getStoredUser();
   const BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 
   const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
+  
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const observerTarget = useRef(null);
   
   // Edit Post State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -124,28 +137,64 @@ export default function StartupFeedPage() {
     const fetchFeed = async () => {
       setLoading(true);
       try {
-        let endpoint = "/recommendations/cold-start/posts?limit=20";
+        let endpoint = `/recommendations/cold-start/posts?limit=5&page=${page}`;
         if (user?._id) {
-          endpoint = `/recommendations/posts/${user._id}?limit=20&random=true`;
+          endpoint = `/recommendations/posts/${user._id}?limit=5&page=${page}&random=true`;
         }
 
         const res = await apiFetch(endpoint);
 
         if (res.success && Array.isArray(res.data)) {
           const transformedData = res.data.map((item: any) => transformFeedItem(item));
-          setPosts(transformedData);
+          if (transformedData.length === 0) {
+            setHasMore(false);
+          } else {
+            setPosts(prev => {
+                const newPosts = page === 1 ? transformedData : [...prev, ...transformedData];
+                // Use a Map to ensure uniqueness by ID
+                const uniquePostsMap = new Map<string, FeedPost>();
+                newPosts.forEach(post => {
+                  if (post.id) uniquePostsMap.set(post.id, post);
+                });
+                return Array.from(uniquePostsMap.values());
+            });
+          }
         } else {
           console.error("Failed to load feed:", res.message);
+          setHasMore(false);
         }
       } catch (error) {
         console.error("Error fetching feed:", error);
       } finally {
         setLoading(false);
+        setIsInitialLoading(false);
       }
     };
 
     fetchFeed();
-  }, [user?._id]);
+  }, [page, user?._id]);
+
+  // Infinite Scroll Observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && hasMore && !loading) {
+          setPage(prev => prev + 1);
+        }
+      },
+      { threshold: 1.0 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => {
+      if (observerTarget.current) {
+        observer.unobserve(observerTarget.current);
+      }
+    };
+  }, [hasMore, loading]);
 
   // --- Transform Data ---
   const transformFeedItem = (item: any): FeedPost => {
@@ -435,7 +484,7 @@ export default function StartupFeedPage() {
           </div>
 
           <div className="space-y-6">
-            {loading ? (
+            {isInitialLoading ? (
               Array.from({ length: 3 }).map((_, i) => (
                 <Card key={i} className="animate-pulse">
                   <CardContent className="h-48" />
@@ -588,6 +637,7 @@ export default function StartupFeedPage() {
                 </Card>
               ))
             ) : (
+              !isInitialLoading && (
               <Card className="p-12 text-center border-dashed">
                 <div className="flex flex-col items-center justify-center gap-3">
                   <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
@@ -602,6 +652,18 @@ export default function StartupFeedPage() {
                   )}
                 </div>
               </Card>
+              )
+            )}
+            
+            {loading && hasMore && (
+               <div className="flex justify-center p-8 w-full">
+                  <Loader2 className="animate-spin h-6 w-6 text-primary" />
+               </div>
+            )}
+            
+            {!loading && hasMore && posts.length > 0 && (
+               <div ref={observerTarget} className="h-10 w-full flex justify-center p-4">
+               </div>
             )}
           </div>
         </div>
@@ -661,7 +723,7 @@ export default function StartupFeedPage() {
 
             <div className="p-4 border-t bg-background mt-auto">
               <div className="flex gap-2">
-                <Textarea 
+                <UiTextarea 
                   placeholder="Write a comment..." 
                   className="min-h-[40px] max-h-[100px] resize-none"
                   value={commentText}
@@ -687,12 +749,13 @@ export default function StartupFeedPage() {
           if (!open) setPostToEdit(null);
         }}
         onSuccess={() => {
-          // Refresh posts or update the local state
-          const fetchFeed = async () => {
-             // simplified refetch trigger logic
-             window.location.reload(); 
-          };
-          fetchFeed();
+          // Refresh posts locally without reloading
+          setPage(1);
+          setPosts([]);
+          setHasMore(true);
+          setLoading(true);
+          // The useEffect will trigger automatically since page is reset or we can manually refetch if needed
+          // But resetting page to 1 will trigger the main useEffect
         }}
         initialData={postToEdit ? {
           id: postToEdit.id,
