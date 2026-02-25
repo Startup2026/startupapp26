@@ -75,4 +75,18 @@ async register(data: RegisterData): Promise<{ success: boolean; data?: User; err
   async getCurrentUser(): Promise<{ success: boolean; data?: User; error?: string }> {
     return apiFetch<User>('/users/me');
   },
+
+  async forgotPassword(email: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    return apiFetch('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  async resetPassword(token: string, password: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    return apiFetch(`/auth/reset-password/${token}`, {
+      method: "POST",
+      body: JSON.stringify({ password }),
+    });
+  },
 };

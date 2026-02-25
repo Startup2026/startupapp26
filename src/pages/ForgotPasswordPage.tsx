@@ -6,6 +6,7 @@ import { Logo } from "@/components/Logo";
 import { useToast } from "@/hooks/use-toast";
 import { Mail } from "lucide-react";
 import { Link } from "react-router-dom";
+import { authService } from "@/services/authService";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -19,22 +20,16 @@ export default function ForgotPasswordPage() {
     setMessage("");
 
     try {
-      const response = await fetch("/api/users/auth/forgot-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
+      const result = await authService.forgotPassword(email);
 
-      const data = await response.json();
-
-      if (response.ok) {
+      if (result.success) {
         setMessage("If an account with that email exists, a password reset link has been sent.");
         toast({
           title: "Check your email",
           description: "A password reset link has been sent to your email address.",
         });
       } else {
-        throw new Error(data.message || "Something went wrong");
+        throw new Error(result.error || result.message || "Something went wrong");
       }
     } catch (error: any) {
       toast({

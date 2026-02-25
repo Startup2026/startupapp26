@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/Logo";
 import { useToast } from "@/hooks/use-toast";
+import { authService } from "@/services/authService";
 import { Eye, EyeOff, Lock } from "lucide-react";
 
 export default function ResetPasswordPage() {
@@ -29,22 +30,17 @@ export default function ResetPasswordPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`/api/users/auth/reset-password/${token}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
-      });
+      if (!token) throw new Error("Invalid token");
+      const result = await authService.resetPassword(token, password);
 
-      const data = await response.json();
-
-      if (response.ok) {
+      if (result.success) {
         toast({
           title: "Success",
           description: "Your password has been reset successfully. Please log in.",
         });
         navigate("/login");
       } else {
-        throw new Error(data.message || "Something went wrong");
+        throw new Error(result.error || result.message || "Something went wrong");
       }
     } catch (error: any) {
       toast({
