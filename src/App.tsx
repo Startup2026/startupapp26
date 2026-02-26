@@ -46,6 +46,10 @@ import TrendingJobsPage from "./pages/student/TrendingJobsPost";
 import SavedItemsPage from "./pages/student/SavePage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import StartupVerificationPage from "./pages/StartupVerificationPage";
+
+
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -102,6 +106,10 @@ const App = () => (
             <Route path="/admin/users" element={<AdminUsersPage />} />
             <Route path="/admin/moderation" element={<AdminModerationPage />} />
             <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
+
+            {/* startup verification route */}
+            <Route path="/startup/verification" element={<StartupVerificationPage />} />
+            <Route path="/startup/verification-pending" element={<VerifyPendingPage />} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
