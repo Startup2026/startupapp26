@@ -6,6 +6,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Logo } from "@/components/Logo";
 import { toast } from "@/hooks/use-toast";
 import { startupProfileService } from "@/services/startupProfileService";
+import { paymentService } from "@/services/paymentService";
+
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
 
 const PLANS = [
   {
@@ -77,24 +84,99 @@ export default function SelectPlanPage() {
   const handleSelectPlan = async (planName: string) => {
     setIsSubmitting(planName);
     try {
-      const result = await startupProfileService.selectPlan(planName);
-      if (result.success) {
-        toast({
-          title: "Plan Selected!",
-          description: `Your startup is now on the ${planName} plan.`,
-        });
-        navigate("/startup/dashboard");
+      if (planName === 'FREE' || planName === 'ENTERPRISE') { 
+        // Enterprise might be contact us, but for now treating as free/manual or let it fall through if needed. 
+        // Assuming Enterprise is "Custom" and might not be directly purchasable via this flow without contact.
+        // But if user clicks it, let's create a free plan request or just select it if backend allows.
+        // If amount is 0 in backend, createOrder will fail with 400.
+        
+        const result = await startupProfileService.selectPlan(planName);
+        if (result.success) {
+          toast({
+            title: "Plan Selected!",
+            description: `Your startup is now on the ${planName} plan.`,
+          });
+          navigate("/startup/dashboard");
+        } else {
+          toast({
+            title: "Error",
+            description: result.error || "Failed to update plan. Please try again.",
+            variant: "destructive",
+          });
+        }
       } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to update plan. Please try again.",
-          variant: "destructive",
+        // Init Razorpay order
+        const orderResponse = await paymentService.createOrder(planName);
+        
+        if (orderResponse.error) {
+             throw new Error(orderResponse.error);
+        }
+
+        const order = orderResponse; // API returns the order object directly based on controller
+
+        const options = {
+            key: import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_KEY_PLACEHOLDER", // Ensure VITE_RAZORPAY_KEY_ID is set in .env
+            amount: order.amount,
+            currency: order.currency,
+            name: "Wostup",
+            description: `${planName} Plan Subscription`,
+            order_id: order.id,
+            handler: async function (response: any) {
+                try {
+                    const verifyResponse = await paymentService.verifyPayment({
+                        razorpay_order_id: response.razorpay_order_id,
+                        razorpay_payment_id: response.razorpay_payment_id,
+                        razorpay_signature: response.razorpay_signature
+                    });
+
+                    if (verifyResponse.message === "Payment verified successfully") {
+                         toast({
+                            title: "Payment Successful!",
+                            description: `You remain on ${planName} plan.`,
+                         });
+                         navigate("/startup/dashboard");
+                    } else {
+                         toast({
+                            title: "Payment Verification Failed",
+                            description: "Please contact support.",
+                            variant: "destructive",
+                         });
+                    }
+                } catch (verifyError) {
+                    console.error("Verification error", verifyError);
+                    toast({
+                        title: "Error",
+                        description: "Payment verification failed.",
+                        variant: "destructive",
+                     });
+                }
+            },
+            prefill: {
+                name: "Startup User", // You could fetch user details here
+                email: "startup@example.com",
+                contact: "9999999999"
+            },
+            theme: {
+                color: "#3399cc"
+            }
+        };
+
+        const rzp1 = new window.Razorpay(options);
+        rzp1.on('payment.failed', function (response: any){
+                toast({
+                    title: "Payment Failed",
+                    description: response.error.description,
+                    variant: "destructive",
+                });
         });
+        rzp1.open();
       }
-    } catch (err) {
+
+    } catch (err: any) {
+      console.error(err);
       toast({
         title: "Error",
-        description: "Something went wrong. Please try again later.",
+        description: err.message || "Something went wrong. Please try again later.",
         variant: "destructive",
       });
     } finally {
