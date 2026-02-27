@@ -12,7 +12,8 @@ export const getSocket = (token: string): Socket => {
       auth: {
         token,
       },
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'], // Enable polling fallback
+      withCredentials: true,
     });
 
     socket.on('connect', () => {
