@@ -24,6 +24,14 @@ export default function JobDetailsPage() {
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  const isDeadlinePassed = (() => {
+    if (!job?.deadline) return false;
+    const deadlineDate = new Date(job.deadline);
+    if (Number.isNaN(deadlineDate.getTime())) return false;
+    deadlineDate.setHours(23, 59, 59, 999);
+    return deadlineDate < new Date();
+  })();
+
   // 1. Fetch Job Details (Calls /api/get-job/:id)
   useEffect(() => {
     const loadJob = async () => {
@@ -197,7 +205,14 @@ export default function JobDetailsPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-3 mt-6">
-                  <Button variant="hero" size="lg" onClick={() => setShowApplicationModal(true)}>Apply Now</Button>
+                  <Button
+                    variant="hero"
+                    size="lg"
+                    onClick={() => setShowApplicationModal(true)}
+                    disabled={isDeadlinePassed}
+                  >
+                    {isDeadlinePassed ? "Deadline Passed" : "Apply Now"}
+                  </Button>
                   <Button 
                     variant={isSaved ? "secondary" : "outline"}
                     size="lg" 
@@ -306,7 +321,8 @@ export default function JobDetailsPage() {
         job={{
           id: job._id,
           title: job.role,
-          company: job.startupId?.startupName || "Startup"
+          company: job.startupId?.startupName || "Startup",
+          deadline: job.deadline
         }} 
       />
     </StudentLayout>

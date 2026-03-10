@@ -17,58 +17,59 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     const token = getAuthToken();
-    if (token) {
-      const socketInstance = getSocket(token);
-      setSocket(socketInstance);
-      
-      const user = getStoredUser();
-      const userId = user?.id || user?._id; 
-      
+    if (!token) return;
+
+    const socketInstance = getSocket(token);
+    setSocket(socketInstance);
+
+    const user = getStoredUser();
+    const userId = user?.id || user?._id;
+
+    const joinRoom = () => {
       if (userId) {
-          socketInstance.emit('join', userId);
-          console.log(`[SocketContext] JOINED ROOM: ${userId}`);
+        socketInstance.emit('join', userId);
+        console.log(`[SocketContext] JOINED ROOM: ${userId}`);
       }
+    };
 
-      // Re-join on connect
-      socketInstance.on('connect', () => {
-          if (userId) socketInstance.emit('join', userId);
-      });
+    joinRoom();
+    socketInstance.on('connect', joinRoom);
 
-      // Global Notification Listener
-      socketInstance.on('notification', (payload: any) => {
-        console.log('[SocketContext] Notification received:', payload);
-        toast({
-          title: payload.title || "New Notification",
-          description: payload.message || "You have a new update.",
-        });
+    const handleNotification = (payload: any) => {
+      console.log('[SocketContext] Notification received:', payload);
+      toast({
+        title: payload.title || "New Notification",
+        description: payload.message || "You have a new update.",
       });
+    };
 
-      // Listening for the new real-time notifications
-      socketInstance.on('new_notification', (payload: any) => {
-        console.log('[SocketContext] Real-time Notification:', payload);
-        toast({
-          title: payload.title || "New Notification",
-          description: payload.message || "You have a new update.",
-          variant: "default",
-        });
+    const handleRealtimeNotification = (payload: any) => {
+      console.log('[SocketContext] Real-time Notification:', payload);
+      toast({
+        title: payload.title || "New Notification",
+        description: payload.message || "You have a new update.",
       });
+    };
 
-      // Special handling for application status updates
-      socketInstance.on('applicationStatusUpdated', (payload: any) => {
-        console.log('[SocketContext] Application Status Update:', payload);
-        toast({
-          title: "Application Updated",
-          description: `Your application status for ${payload.jobTitle || 'the role'} is now ${payload.status}.`,
-        });
+    const handleApplicationUpdate = (payload: any) => {
+      console.log('[SocketContext] Application Status Update:', payload);
+      toast({
+        title: "Application Updated",
+        description: `Your application status for ${payload.jobTitle || 'the role'} is now ${payload.status}.`,
       });
-    }
+    };
+
+    socketInstance.on('notification', handleNotification);
+    socketInstance.on('new_notification', handleRealtimeNotification);
+    socketInstance.on('applicationStatusUpdated', handleApplicationUpdate);
 
     return () => {
-      // Cleanup listeners on unmount
-      if (socket) {
-        socket.off('notification');
-        socket.off('applicationStatusUpdated');
-      }
+      socketInstance.off('connect', joinRoom);
+      socketInstance.off('notification', handleNotification);
+      socketInstance.off('new_notification', handleRealtimeNotification);
+      socketInstance.off('applicationStatusUpdated', handleApplicationUpdate);
+      socketInstance.disconnect();
+      setSocket(null);
     };
   }, []);
 

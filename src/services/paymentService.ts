@@ -1,7 +1,8 @@
 import { apiFetch } from '@/lib/api';
+import type { PlanName } from '@/config/planFeatures';
 
 export const paymentService = {
-  createOrder: async (planType: string) => {
+  createOrder: async (planType: PlanName) => {
     try {
       // apiFetch returns the parsed JSON automatically
       const result = await apiFetch(`/payment/create-order`, {

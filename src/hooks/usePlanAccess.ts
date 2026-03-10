@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { startupProfileService, StartupProfile } from "@/services/startupProfileService";
-import { PLAN_FEATURES, FeatureKey, PlanName } from "@/config/planFeatures";
+import { PLAN_FEATURES, FeatureKey, PlanName, normalizePlanName } from "@/config/planFeatures";
 
 export function usePlanAccess() {
   const { user } = useAuth();
@@ -19,14 +19,17 @@ export function usePlanAccess() {
         if (res.success && res.data) {
           setProfile(res.data);
           
-          // Also check if plan is selected
-          if (!res.data.subscriptionPlan && window.location.pathname !== "/startup/select-plan") {
-            navigate("/startup/select-plan");
-          }
-        } else if ((res as any).status === 403 || (res as any).error?.includes("profile not found")) {
-            // Redirect to profile creation if blocked
-            if (window.location.pathname !== "/startup/create-profile") {
+          // Note: All profiles default to "FREE" plan, so we don't need to redirect if plan is missing
+          // The plan selection is now more of a choice than a requirement for dashboard access
+        } else {
+            const status = (res as any).status;
+            const errorMsg = typeof (res as any).error === "string" ? (res as any).error.toLowerCase() : "";
+            const isMissingProfile = status === 404 || errorMsg.includes("profile not found");
+
+            if (isMissingProfile && window.location.pathname !== "/startup/create-profile") {
               navigate("/startup/create-profile");
+            } else if (!isMissingProfile) {
+              console.warn("usePlanAccess: profile fetch failed but will not redirect", res);
             }
         }
       } catch (error) {
@@ -45,7 +48,7 @@ export function usePlanAccess() {
 
   const hasAccess = useCallback((featureKey: FeatureKey): boolean => {
     if (!profile) return false;
-    const plan = (profile.subscriptionPlan as PlanName) || "FREE";
+    const plan = normalizePlanName(profile.subscriptionPlan);
     const features = PLAN_FEATURES[plan];
     const value = (features as any)[featureKey];
     return value !== false && value !== 0;
@@ -53,7 +56,7 @@ export function usePlanAccess() {
 
   const getFeatureValue = useCallback((featureKey: FeatureKey) => {
     if (!profile) return null;
-    const plan = (profile.subscriptionPlan as PlanName) || "FREE";
+    const plan = normalizePlanName(profile.subscriptionPlan);
     return (PLAN_FEATURES[plan] as any)[featureKey];
   }, [profile]);
 
@@ -74,7 +77,7 @@ export function usePlanAccess() {
   return {
     profile,
     loading,
-    plan: (profile?.subscriptionPlan as PlanName) || "FREE",
+    plan: normalizePlanName(profile?.subscriptionPlan),
     hasAccess,
     getFeatureValue,
     checkAccessAndShowModal,

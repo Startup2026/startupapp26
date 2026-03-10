@@ -22,6 +22,7 @@ import {
   ArrowLeft,
   Rocket,
   Heart,
+  Eye,
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api";
 
@@ -124,6 +125,10 @@ export default function StartupProfilePage() {
                   <span className="flex items-center gap-1">
                     <Users className="h-4 w-4" /> 
                     {startup.numberOfEmployees || startup.teamSize || 1} Employees
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Eye className="h-4 w-4" />
+                    {startup.views || 0} Unique Views
                   </span>
                   {startup.foundedYear && (
                     <span className="flex items-center gap-1"><Calendar className="h-4 w-4" /> Founded {startup.foundedYear}</span>

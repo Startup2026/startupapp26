@@ -1,4 +1,5 @@
 import { apiFetch } from '@/lib/api';
+import type { AnyPlanName, PlanName } from '@/config/planFeatures';
 
 export interface StartupProfile {
   _id: string;
@@ -31,9 +32,11 @@ export interface StartupProfile {
   hiring?: boolean;
   verified?: boolean;
   views?: number;
-  subscriptionPlan: "FREE" | "GROWTH" | "PRO" | "ENTERPRISE";
+  subscriptionPlan: AnyPlanName;
   subscriptionStatus: "ACTIVE" | "TRIAL" | "EXPIRED";
   subscriptionEndDate?: string;
+  eligibility_status?: string;
+  approval_status?: string;
 }
 
 export interface CreateStartupProfileData {
@@ -64,6 +67,20 @@ export interface CreateStartupProfileData {
     role?: string;
   }>;
   hiring?: boolean;
+  // Verification fields
+  brandName?: string;
+  companyType?: string;
+  registeredCity?: string;
+  registeredState?: string;
+  cin?: string;
+  gstNumber?: string;
+  startupIndiaId?: string;
+  founderPhone?: string;
+  founderEmail?: string;
+  // Incubation
+  incubator_claimed?: boolean;
+  incubatorId?: string;
+  incubator?: string;
 }
 
 export const startupProfileService = {
@@ -86,8 +103,8 @@ export const startupProfileService = {
     return apiFetch<StartupProfile>('/startupProfile/me');
   },
 
-  async updateProfile(id: string, data: Partial<StartupProfile>): Promise<{ success: boolean; data?: StartupProfile; error?: string }> {
-    return apiFetch<StartupProfile>(`/startupProfile/${id}`, {
+  async updateProfile(id: string, data: Partial<any>): Promise<{ success: boolean; data?: any; error?: string }> {
+    return apiFetch<any>(`/startupProfile/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -99,7 +116,7 @@ export const startupProfileService = {
     });
   },
 
-  async selectPlan(plan: string): Promise<{ success: boolean; data?: any; error?: string }> {
+  async selectPlan(plan: PlanName): Promise<{ success: boolean; data?: any; error?: string }> {
     return apiFetch('/startupProfile/select-plan', {
       method: 'POST',
       body: JSON.stringify({ plan }),

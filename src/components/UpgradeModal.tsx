@@ -16,7 +16,7 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, Rocket, Zap } from "lucide-react";
+import { Check, Rocket, Zap, Shield } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface UpgradeModalProps {
@@ -27,17 +27,36 @@ interface UpgradeModalProps {
 
 const PLANS = [
   {
-    name: "GROWTH",
-    price: "$49/mo",
+    name: "SPRINT_3MO",
+    title: "Sprint · 3 Months",
+    price: "₹999",
+    billing: "One-time · 3 months",
     icon: <Rocket className="h-5 w-5 text-blue-500" />,
-    features: ["Unlimited job posts", "Full applicant access", "Interview Calendar", "Advanced Filtering"],
   },
   {
-    name: "PRO",
-    price: "$149/mo",
-    icon: <Zap className="h-5 w-5 text-yellow-500" />,
-    features: ["AI Candidate Ranking", "Auto Shortlisting", "Featured Listings", "Advanced Analytics"],
+    name: "BUILDER_6MO",
+    title: "Builder · 6 Months",
+    price: "₹1,999",
+    billing: "Most popular · 6 months",
+    icon: <Zap className="h-5 w-5 text-amber-500" />,
   },
+  {
+    name: "PARTNER_12MO",
+    title: "Partner · 12 Months",
+    price: "₹2,999",
+    billing: "Year-long hiring",
+    icon: <Shield className="h-5 w-5 text-purple-500" />,
+  },
+];
+
+const SHARED_FEATURES = [
+  "All platform features included",
+  "Advanced analytics",
+  "Bulk email outreach",
+  "Advanced job analysis",
+  "Social recruiter suite",
+  "Interview scheduler",
+  "Priority support",
 ];
 
 export const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, featureName }) => {
@@ -61,7 +80,26 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, fea
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+        <Card className="mt-2">
+          <CardHeader>
+            <UICardTitle className="text-base">Included in all paid plans</UICardTitle>
+            <CardDescription>
+              Same full access in every plan. Only duration and price differ.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {SHARED_FEATURES.map((feature) => (
+                <div key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Check className="h-4 w-4 text-green-500" />
+                  {feature}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4">
           {PLANS.map((plan) => (
             <Card key={plan.name} className="border-2 hover:border-primary transition-colors cursor-pointer group">
               <CardHeader>
@@ -69,19 +107,13 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, fea
                   <div className="p-2 bg-secondary rounded-lg">{plan.icon}</div>
                   <div className="text-right">
                     <span className="text-xl font-bold">{plan.price}</span>
+                    <p className="text-xs text-muted-foreground">{plan.billing}</p>
                   </div>
                 </div>
-                <UICardTitle className="mt-2 text-xl font-bold">{plan.name}</UICardTitle>
+                <UICardTitle className="mt-2 text-xl font-bold">{plan.title}</UICardTitle>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2">
-                      <Check className="h-4 w-4 text-green-500" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
+                <p className="text-sm text-muted-foreground">Includes full shared feature bundle.</p>
               </CardContent>
               <CardFooter>
                 <Button 
@@ -92,7 +124,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, fea
                     navigate("/startup/select-plan");
                   }}
                 >
-                  Upgrade Now
+                  Choose Plan
                 </Button>
               </CardFooter>
             </Card>

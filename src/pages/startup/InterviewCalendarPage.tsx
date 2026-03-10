@@ -127,10 +127,10 @@ export default function InterviewCalendarPage() {
           <div className="h-[70vh] flex flex-col items-center justify-center text-center p-6 bg-card rounded-xl border-2 border-dashed">
               <CalendarIcon className="h-16 w-16 text-muted-foreground mb-4" />
               <h2 className="text-2xl font-bold mb-2">Centralized Interview Management</h2>
-              <p className="text-muted-foreground max-w-md mb-6">
+                <p className="text-muted-foreground max-w-md mb-6">
                   Schedule, manage, and track all your candidate interviews in one place. 
-                  Upgrade to Growth or Pro plan to access this feature.
-              </p>
+                  Upgrade to the Sprint, Builder, or Partner plan to access this feature.
+                </p>
               <Button size="lg" onClick={() => navigate("/startup/select-plan")}>
                   Upgrade to Premium
               </Button>

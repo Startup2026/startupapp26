@@ -31,6 +31,7 @@ interface JobFormData {
   location: string;
   salary: string;
   openings: number;
+  deadline: string;
 }
 
 const skillsList = [
@@ -51,7 +52,8 @@ export function CreateJobModal({ open, onOpenChange, onJobCreated }: CreateJobMo
     jobType: "Full-Time",
     location: "Remote",
     salary: "",
-    openings: 1
+    openings: 1,
+    deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   });
 
   useEffect(() => {
@@ -104,7 +106,7 @@ export function CreateJobModal({ open, onOpenChange, onJobCreated }: CreateJobMo
             stipend: false, // Defaulting for now
             salary: Number(formData.salary) || 0,
             openings: Number(formData.openings) || 1,
-            deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+            deadline: formData.deadline,
             jobType: formData.jobType,
             location: formData.location,
             Tag: formData.skillsRequired // Send skills as Tags
@@ -225,6 +227,19 @@ export function CreateJobModal({ open, onOpenChange, onJobCreated }: CreateJobMo
                 className="mt-1.5"
               />
             </div>
+          </div>
+
+          <div>
+            <Label>Application Deadline <span className="text-destructive">*</span></Label>
+            <Input
+              type="date"
+              name="deadline"
+              value={formData.deadline}
+              onChange={handleChange}
+              min={new Date().toISOString().split('T')[0]}
+              required
+              className="mt-1.5"
+            />
           </div>
           
            <div>

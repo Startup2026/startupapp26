@@ -162,6 +162,14 @@ export default function JobListingsPage() {
                 Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-44 w-full rounded-xl" />)
               ) : filteredJobs.map((job) => (
                 <Link key={job._id} to={`/student/jobs/${job._id}`}>
+                  {(() => {
+                    const deadlineDate = new Date(job.deadline);
+                    const hasValidDeadline = !Number.isNaN(deadlineDate.getTime());
+                    if (hasValidDeadline) {
+                      deadlineDate.setHours(23, 59, 59, 999);
+                    }
+                    const isDeadlinePassed = hasValidDeadline ? deadlineDate < new Date() : false;
+                    return (
                   <Card variant="interactive">
                     <CardContent className="p-6">
                       <div className="flex flex-col md:flex-row md:items-start gap-4">
@@ -190,14 +198,18 @@ export default function JobListingsPage() {
                             </div>
                             <div className="flex items-center gap-1">
                               <Clock className="h-4 w-4" /> 
-                              {new Date(job.createdAt).toLocaleDateString()}
+                              {hasValidDeadline ? `Deadline: ${new Date(job.deadline).toLocaleDateString()}` : new Date(job.createdAt).toLocaleDateString()}
                             </div>
                           </div>
                         </div>
-                        <Button variant="hero" className="md:self-center">Apply Now</Button>
+                        <Button variant="hero" className="md:self-center" disabled={isDeadlinePassed}>
+                          {isDeadlinePassed ? "Closed" : "Apply Now"}
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
+                    );
+                  })()}
                 </Link>
               ))}
               

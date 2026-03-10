@@ -142,7 +142,7 @@ export default function JobAnalysisPage() {
               <h2 className="text-2xl font-bold mb-2">Unlock Advanced Job Analysis</h2>
               <p className="text-muted-foreground max-w-md mb-6">
                   Deep dive into your hiring performance, candidate demographics, and application trends. 
-                  Upgrade to Growth, Pro or Enterprise plan to access this feature.
+                  Upgrade to the Builder or Partner plan to access this feature.
               </p>
               <Button size="lg" onClick={() => (window.location.href = "/startup/select-plan")}>
                   Upgrade to Premium

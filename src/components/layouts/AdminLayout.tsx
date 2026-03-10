@@ -1,5 +1,5 @@
-import { ReactNode, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { ReactNode, useState, useEffect, useCallback } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Building2,
@@ -15,6 +15,12 @@ import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -28,12 +34,16 @@ import {
   SheetClose,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+import { useSocket } from "@/contexts/SocketContext";
+import { formatDistanceToNow } from "date-fns";
 
 interface AdminLayoutProps {
   children: ReactNode;
 }
 
-const navItems = [
+const adminNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/admin/dashboard" },
   { icon: Building2, label: "Startups", href: "/admin/startups" },
   { icon: Users, label: "Users", href: "/admin/users" },
@@ -41,9 +51,166 @@ const navItems = [
   { icon: BarChart3, label: "Analytics", href: "/admin/analytics" },
 ];
 
+const incubatorNavItems = [
+  { icon: LayoutDashboard, label: "Dashboard", href: "/incubator/dashboard" },
+  { icon: BarChart3, label: "Social Analysis", href: "/incubator/social-analysis" },
+  { icon: Bell, label: "Notifications", href: "/incubator/notifications" },
+];
+
 export function AdminLayout({ children }: AdminLayoutProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const { user, logout } = useAuth();
+  const { socket } = useSocket();
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifOpen, setNotifOpen] = useState(false);
+
+  useEffect(() => {
+    // If the user is an incubator admin but their profile is not completed
+    if (user?.role === 'incubator_admin' && !user.profileCompleted && location.pathname !== '/incubator/create-profile') {
+      navigate('/incubator/create-profile');
+    }
+  }, [user, location.pathname, navigate]);
+  
+  const navItems = user?.role === 'incubator_admin' ? incubatorNavItems : adminNavItems;
+
+  const fetchNotifications = useCallback(async () => {
+    if (user?.role !== 'incubator_admin') return;
+    try {
+      const [countRes, notifRes] = await Promise.all([
+        apiFetch<{ count: number }>('/notifications/unread-count'),
+        apiFetch<any[]>('/notifications'),
+      ]);
+
+      if (countRes.success && typeof countRes.count === 'number') {
+        setUnreadCount(countRes.count);
+      }
+
+      if (notifRes.success && notifRes.data) {
+        setNotifications(notifRes.data.slice(0, 10));
+      }
+    } catch (error) {
+      console.error('Failed to load notifications', error);
+    }
+  }, [user?.role]);
+
+  useEffect(() => {
+    if (user?.role !== 'incubator_admin') return;
+    fetchNotifications();
+
+    const refresh = () => fetchNotifications();
+    window.addEventListener('notificationRead', refresh);
+    window.addEventListener('allNotificationsRead', refresh);
+
+    return () => {
+      window.removeEventListener('notificationRead', refresh);
+      window.removeEventListener('allNotificationsRead', refresh);
+    };
+  }, [fetchNotifications, user?.role]);
+
+  useEffect(() => {
+    if (!socket || user?.role !== 'incubator_admin') return;
+
+    const handleNewNotification = (notification: any) => {
+      setUnreadCount((prev) => prev + 1);
+      setNotifications((prev) => {
+        const exists = prev.some((n) => n._id === notification._id);
+        if (exists) return prev;
+        return [notification, ...prev].slice(0, 10);
+      });
+    };
+
+    socket.on('notification', handleNewNotification);
+    socket.on('new_notification', handleNewNotification);
+
+    return () => {
+      socket.off('notification', handleNewNotification);
+      socket.off('new_notification', handleNewNotification);
+    };
+  }, [socket, user?.role]);
+
+  const renderNotificationTrigger = () => {
+    if (user?.role !== 'incubator_admin') {
+      return (
+        <Button variant="ghost" size="icon" className="relative">
+          <Bell className="h-5 w-5" />
+          <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-accent" />
+        </Button>
+      );
+    }
+
+    return (
+      <Popover
+        open={notifOpen}
+        onOpenChange={(openState) => {
+          setNotifOpen(openState);
+          if (openState) {
+            fetchNotifications();
+          }
+        }}
+      >
+        <PopoverTrigger asChild>
+          <Button variant="ghost" size="icon" className="relative h-9 w-9">
+            <Bell className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 px-1 min-w-[1.1rem] h-4 rounded-full bg-accent text-[10px] font-bold text-accent-foreground flex items-center justify-center border-2 border-background">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-80 p-0" align="end">
+          <div className="flex items-center justify-between p-4 border-b">
+            <h3 className="font-semibold text-sm">Notifications</h3>
+            {unreadCount > 0 && (
+              <span className="text-xs text-muted-foreground">{unreadCount} unread</span>
+            )}
+          </div>
+          <ScrollArea className="h-[360px]">
+            {notifications.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground">
+                <Bell className="h-8 w-8 mx-auto mb-3 opacity-60" />
+                <p className="text-sm">No notifications yet</p>
+              </div>
+            ) : (
+              <div className="divide-y">
+                {notifications.map((notif) => (
+                  <div
+                    key={notif._id}
+                    className="p-4 hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() => {
+                      setNotifOpen(false);
+                      navigate('/incubator/notifications');
+                    }}
+                  >
+                    <p className="text-sm font-semibold line-clamp-1">{notif.title}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{notif.message}</p>
+                    <div className="text-[10px] text-muted-foreground mt-2">
+                      {formatDistanceToNow(new Date(notif.createdAt), { addSuffix: true })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+          <div className="p-2 border-t">
+            <Button
+              variant="ghost"
+              className="w-full justify-center text-sm"
+              onClick={() => {
+                setNotifOpen(false);
+                navigate('/incubator/notifications');
+              }}
+            >
+              View All
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
+  };
 
   const NavLinks = ({ isMobile = false }: { isMobile?: boolean }) => (
     <nav className="flex-1 space-y-1">
@@ -127,10 +294,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           <div className="hidden lg:block flex-1" />
 
           <div className="flex items-center gap-4 ml-auto">
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-accent" />
-            </Button>
+            {renderNotificationTrigger()}
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -138,17 +302,19 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   <Avatar className="h-8 w-8">
                     <AvatarImage src="" />
                     <AvatarFallback className="bg-destructive text-destructive-foreground text-sm">
-                      AD
+                      {user?.role === 'incubator_admin' ? 'IA' : 'AD'}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="hidden md:block text-sm font-medium">Admin</span>
+                  <span className="hidden md:block text-sm font-medium">
+                    {user?.role === 'incubator_admin' ? 'Incubator Admin' : 'Platform Admin'}
+                  </span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48 bg-card border-border">
                 <DropdownMenuItem>Settings</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link to="/login">Sign out</Link>
+                <DropdownMenuItem onClick={() => logout()}>
+                  Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

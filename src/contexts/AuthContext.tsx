@@ -7,10 +7,11 @@ import { getStoredUser, clearAuthToken } from '@/lib/api';
 type AuthContextValue = {
     user: User | null;
     login: (email: string, password: string) => Promise<{ success: boolean; onboardingStep?: string; error?: string }>;
-    register: (username: string, email: string, password: string, role: 'student' | 'startup' | 'admin') => Promise<{ success: boolean; error?: string }>;
+    register: (username: string, email: string, password: string, role: 'student' | 'startup' | 'admin' | 'incubator_admin') => Promise<{ success: boolean; error?: string }>;
     verifyEmail: (email: string, token: string) => Promise<{ success: boolean; onboardingStep?: string; error?: string }>;
     logout: () => Promise<void>;
-    resendVerification: (email: string) => Promise<{ success: boolean; error?: string }>; 
+    resendVerification: (email: string) => Promise<{ success: boolean; error?: string }>;
+    refreshUser: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -30,6 +31,14 @@ export const AuthProvider: React.FC<any> = ({ children }) => {
         if (stored && !user) setUser(stored);
     }, []);
 
+    const refreshUser = async () => {
+        const result = await authService.getCurrentUser();
+        if (result.success && result.data) {
+            setUser(result.data);
+            localStorage.setItem('user', JSON.stringify(result.data));
+        }
+    };
+
     const login = async (email: string, password: string) => {
         const result = await authService.login(email, password);
         if (result.success && result.data) {
@@ -45,7 +54,7 @@ export const AuthProvider: React.FC<any> = ({ children }) => {
         return { success: false, error: message };
     };
 
-    const register = async (username: string, email: string, password: string, role: 'student' | 'startup' | 'admin') => {
+    const register = async (username: string, email: string, password: string, role: 'student' | 'startup' | 'admin' | 'incubator_admin') => {
         const result = await authService.register({ username, email, password, role });
         if (result.success) {
             // Do NOT auto-login; require email verification
@@ -79,7 +88,7 @@ export const AuthProvider: React.FC<any> = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, register, verifyEmail, logout, resendVerification }}>
+        <AuthContext.Provider value={{ user, login, register, verifyEmail, logout, resendVerification, refreshUser }}>
             {children}
         </AuthContext.Provider>
     );

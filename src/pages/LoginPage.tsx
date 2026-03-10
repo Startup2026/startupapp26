@@ -30,7 +30,13 @@ export default function LoginPage() {
       });
 
       // Handle onboarding redirection
-      if (result.onboardingStep === 'profile') {
+      if (result.onboardingStep === 'startup-verification') {
+        navigate('/startup/verification');
+        return;
+      } else if (result.onboardingStep === 'incubator-profile') {
+        navigate('/incubator/create-profile');
+        return;
+      } else if (result.onboardingStep === 'profile') {
         navigate('/startup/create-profile');
         return;
       } else if (result.onboardingStep === 'plan') {
@@ -46,6 +52,8 @@ export default function LoginPage() {
           navigate("/student/dashboard");
         } else if (user.role === "startup") {
           navigate("/startup/dashboard");
+        } else if (user.role === "incubator_admin") {
+          navigate("/incubator/dashboard");
         } else {
           navigate("/admin/dashboard");
         }

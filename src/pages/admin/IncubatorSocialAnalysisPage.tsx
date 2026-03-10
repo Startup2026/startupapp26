@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   Heart,
   MessageCircle,
@@ -13,12 +13,10 @@ import {
   Eye,
   ThumbsUp,
   Bookmark,
+  ArrowLeft
 } from "lucide-react";
-import { postService, Post } from "@/services/postService";
-import { feedService } from "@/services/feedService";
+import { feedService, Post } from "@/services/feedService";
 import { format } from "date-fns";
-import { toast } from "@/hooks/use-toast";
-import { API_BASE_URL } from "@/lib/api";
 import {
   BarChart,
   Bar,
@@ -33,7 +31,7 @@ import {
   AreaChart,
 } from "recharts";
 
-import { StartupLayout } from "@/components/layouts/StartupLayout";
+import { AdminLayout } from "@/components/layouts/AdminLayout";
 import {
   Card,
   CardContent,
@@ -57,20 +55,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
-import { usePlanAccess } from "@/hooks/usePlanAccess";
-import { UpgradeModal } from "@/components/UpgradeModal";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /* -------------------- HELPERS -------------------- */
-
+// Same helpers as SocialMediaAnalysisPage
 const TOOLTIP_STYLE = {
   backgroundColor: "hsl(var(--card))",
   border: "1px solid hsl(var(--border))",
   borderRadius: "8px",
   fontSize: "12px",
 };
-const BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 
 function getPostType(post: Post): "photo" | "video" | "text" {
   if (post.media?.video) return "video";
@@ -85,83 +80,45 @@ function getWeekLabel(dateStr: string): string {
   return startOfWeek.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-/* -------------------- PAGE -------------------- */
-
-export default function SocialMediaAnalysisPage() {
-  const { 
-    hasAccess, 
-    loading: planLoading, 
-    isUpgradeModalOpen, 
-    closeUpgradeModal, 
-    triggeredFeature,
-    checkAccessAndShowModal
-  } = usePlanAccess();
-  const navigate = useNavigate();
+export default function IncubatorSocialAnalysisPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
-  const [analyticsPosts, setAnalyticsPosts] = useState<any[]>([]); // Posts with populated analytics
-  const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [filter, setFilter] = useState("latest");
 
-  // Fetch standard posts for summary cards
   useEffect(() => {
-    const fetchPosts = async () => {
-      if (!hasAccess("socialRecruiter")) {
-        setLoading(false);
-        return;
-      }
-      try {
-        setLoading(true);
-        const result = await postService.getStartupPosts();
-        if (result.success && result.data) {
-          setPosts(result.data);
-        } else {
-            console.warn("Failed to fetch posts");
-            setPosts([]);
-        }
-      } catch (error) {
-        console.error("Error fetching posts:", error);
-        setPosts([]);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchPosts();
-  }, [hasAccess]);
+  }, [filter]);
 
-  // Fetch analytics-enriched posts for the table
-  useEffect(() => {
-    if (!hasAccess("socialRecruiter")) {
-        setAnalyticsLoading(false);
-        return;
+  const fetchPosts = async () => {
+    setLoading(true);
+    try {
+      const res = await feedService.getMyPosts(filter);
+      if (res.success && res.data) {
+        setPosts(res.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch posts", error);
+    } finally {
+      setLoading(false);
     }
-    const fetchAnalytics = async () => {
-        setAnalyticsLoading(true);
-        try {
-            const res = await feedService.getMyPosts(filter);
-            if (res.success && res.data) {
-                setAnalyticsPosts(res.data);
-            }
-        } catch (error) {
-            console.error("Failed to fetch analytics posts", error);
-        } finally {
-            setAnalyticsLoading(false);
-        }
-    };
-    fetchAnalytics();
-  }, [filter, hasAccess]);
+  };
 
   const analytics = useMemo(() => {
     const totalPosts = posts.length;
-    const totalLikes = posts.reduce((sum, p) => sum + (p.likes?.length || 0), 0);
-    const totalComments = posts.reduce((sum, p) => sum + (p.comments?.length || 0), 0);
+    // Use the populated analytics object
+    const totalLikes = posts.reduce((sum, p) => sum + (p.analytics?.likes_count || 0), 0);
+    const totalComments = posts.reduce((sum, p) => sum + (p.analytics?.comments_count || 0), 0);
+    // Engagement Rate is avg of per-post engagement rates OR total engagement / total views?
+    // Let's use average of per-post engagement rates for "Account Engagement" often, OR (Total Engagement / Total Posts)
+    // The previous page calculated `(totalLikes + totalComments) / totalPosts`.
     const avgEngagement = totalPosts > 0 ? ((totalLikes + totalComments) / totalPosts).toFixed(1) : "0";
 
     // Engagement trend by week
     const weekMap = new Map<string, number>();
     posts.forEach((p) => {
+      if (!p.createdAt) return;
       const week = getWeekLabel(p.createdAt);
-      const engagement = (p.likes?.length || 0) + (p.comments?.length || 0);
+      const engagement = (p.analytics?.likes_count || 0) + (p.analytics?.comments_count || 0);
       weekMap.set(week, (weekMap.get(week) || 0) + engagement);
     });
     const engagementTrend = Array.from(weekMap.entries())
@@ -173,22 +130,21 @@ export default function SocialMediaAnalysisPage() {
       .map((p) => ({
         _id: p._id,
         title: p.title || "Untitled Post",
-        likes: p.likes?.length || 0,
-        comments: p.comments?.length || 0,
-        engagement: (p.likes?.length || 0) + (p.comments?.length || 0),
-        // @ts-ignore
+        likes: p.analytics?.likes_count || 0,
+        comments: p.analytics?.comments_count || 0,
+        engagement: (p.analytics?.likes_count || 0) + (p.analytics?.comments_count || 0),
         type: getPostType(p),
         thumbnail: p.media?.photo,
       }))
-      .sort((a, b) => b.engagement - a.engagement);
+      .sort((a, b) => b.engagement - a.engagement)
+      .slice(0, 5); // Top 5
 
     // Post type performance
     const typeMap: Record<string, { total: number; count: number }> = {};
     posts.forEach((p) => {
-      // @ts-ignore
       const type = getPostType(p);
       if (!typeMap[type]) typeMap[type] = { total: 0, count: 0 };
-      typeMap[type].total += (p.likes?.length || 0) + (p.comments?.length || 0);
+      typeMap[type].total += (p.analytics?.likes_count || 0) + (p.analytics?.comments_count || 0);
       typeMap[type].count += 1;
     });
     const postTypePerformance = Object.entries(typeMap).map(([type, data]) => ({
@@ -199,12 +155,13 @@ export default function SocialMediaAnalysisPage() {
     // Posting frequency
     const now = new Date();
     const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    // createdAt might be string or Date depending on interface but usually string from JSON
+    const postsThisMonth = posts.filter((p) => p.createdAt && new Date(p.createdAt) >= thisMonthStart).length;
+    const postsThisWeek = posts.filter((p) => p.createdAt && new Date(p.createdAt) >= new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)).length;
 
-    const postsThisMonth = posts.filter((p) => new Date(p.createdAt) >= thisMonthStart).length;
-    const postsThisWeek = posts.filter((p) => new Date(p.createdAt) >= new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)).length;
-
-    // Avg posts per month (based on data range)
-    const dates = posts.length > 0 ? posts.map((p) => new Date(p.createdAt).getTime()) : [now.getTime()];
+    // Avg posts per month
+    const dates = posts.length > 0 ? posts.map((p) => new Date(p.createdAt || new Date()).getTime()) : [now.getTime()];
     const minDate = Math.min(...dates);
     const maxDate = Math.max(...dates);
     const rangeMonths = Math.max(1, Math.ceil((maxDate - minDate) / (30 * 24 * 60 * 60 * 1000)));
@@ -224,146 +181,118 @@ export default function SocialMediaAnalysisPage() {
     };
   }, [posts]);
 
-  if (loading) {
+  if (loading && posts.length === 0) {
     return (
-      <StartupLayout>
+      <AdminLayout>
           <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-accent" />
             <span className="ml-3 text-muted-foreground font-medium">Analyzing your social presence...</span>
           </div>
-      </StartupLayout>
+      </AdminLayout>
     );
   }
 
   const statCards = [
     {
       title: "Total Posts",
-      value: analytics.totalPosts.toLocaleString(),
-      icon: FileText,
+      value: analytics.totalPosts,
+      icon: <FileText className="h-4 w-4 text-muted-foreground" />,
+      desc: "All time posts",
+    },
+    {
+      title: "Avg. Engagement",
+      value: analytics.avgEngagement,
+      icon: <TrendingUp className="h-4 w-4 text-muted-foreground" />,
+      desc: "Likes + Comments / Post",
     },
     {
       title: "Total Likes",
-      value: analytics.totalLikes.toLocaleString(),
-      icon: Heart,
+      value: analytics.totalLikes,
+      icon: <Heart className="h-4 w-4 text-muted-foreground" />,
+      desc: "Across all posts",
     },
     {
       title: "Total Comments",
-      value: analytics.totalComments.toLocaleString(),
-      icon: MessageCircle,
-    },
-    {
-      title: "Avg Engagement / Post",
-      value: analytics.avgEngagement,
-      icon: TrendingUp,
+      value: analytics.totalComments,
+      icon: <MessageCircle className="h-4 w-4 text-muted-foreground" />,
+      desc: "Community discussions",
     },
   ];
 
-  if (planLoading) {
-    return (
-      <StartupLayout>
-        <div className="h-[60vh] flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      </StartupLayout>
-    );
-  }
-
-  if (!hasAccess("socialRecruiter")) {
-    return (
-      <StartupLayout>
-          <div className="h-[70vh] flex flex-col items-center justify-center text-center p-6 bg-card rounded-xl border-2 border-dashed">
-              <TrendingUp className="h-16 w-16 text-muted-foreground mb-4" />
-              <h2 className="text-2xl font-bold mb-2">Content Performance Insights</h2>
-                <p className="text-muted-foreground max-w-md mb-6">
-                  Analyze your social presence, engagement rates, and content efficiency. 
-                  Upgrade to the Sprint (3-Month) or Partner (12-Month) plan to access this feature.
-                </p>
-              <Button size="lg" onClick={() => navigate("/startup/select-plan")}>
-                  Upgrade to Premium
-              </Button>
-          </div>
-      </StartupLayout>
-    );
-  }
-
   return (
-    <StartupLayout>
-      <div className="space-y-8 animate-fade-in">
-        {/* PAGE HEADER */}
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-3">
-            <BarChart3 className="h-8 w-8 text-accent" />
+    <AdminLayout>
+      <div className="p-6 lg:p-8 space-y-8 animate-fade-in w-full max-w-7xl mx-auto">
+        <div className="flex flex-col gap-2">
+            <Link to="/incubator/dashboard" className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1 mb-2">
+                <ArrowLeft className="h-3 w-3" /> Back to Dashboard
+            </Link>
+            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent bg-300% animate-gradient">
             Social Media Analysis
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Post engagement metrics and content performance insights
-          </p>
+            </h1>
+            <p className="text-muted-foreground text-lg">
+            Detailed insights into your content performance and audience engagement.
+            </p>
         </div>
 
-        {/* STAT CARDS */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {statCards.map((stat) => (
-            <Card key={stat.title} variant="glass">
-              <CardContent className="pt-6">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">{stat.title}</p>
-                    <p className="text-3xl font-bold tracking-tight">
-                      {stat.value}
-                    </p>
-                  </div>
-                  <div className="h-11 w-11 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
-                    <stat.icon className="h-5 w-5 text-accent" />
-                  </div>
-                </div>
+        {/* OVERVIEW CARDS */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {statCards.map((stat, index) => (
+            <Card key={index} className="overflow-hidden border-l-4 border-l-primary/50 hover:shadow-md transition-all">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  {stat.title}
+                </CardTitle>
+                {stat.icon}
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stat.value}</div>
+                <p className="text-xs text-muted-foreground">{stat.desc}</p>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        {/* ENGAGEMENT TREND + POST TYPE PERFORMANCE */}
-        <div className="grid lg:grid-cols-5 gap-6">
-          {/* ENGAGEMENT TREND */}
-          <Card className="lg:col-span-3">
+        {/* CHARTS ROW 1 */}
+        <div className="grid gap-4 md:grid-cols-7">
+          {/* ENGAGEMENT OVER TIME */}
+          <Card className="md:col-span-4">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-accent" />
-                Engagement Trend
-              </CardTitle>
-              <CardDescription>
-                Total likes + comments grouped by week
-              </CardDescription>
+              <CardTitle>Engagement Trends</CardTitle>
+              <CardDescription>Weekly likes + comments performance</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="h-72">
+            <CardContent className="pl-2">
+              <div className="h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={analytics.engagementTrend}>
                     <defs>
-                      <linearGradient id="engagementGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0} />
+                      <linearGradient id="colorEngagement" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
                       </linearGradient>
                     </defs>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="hsl(var(--border))"
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                    <XAxis 
+                      dataKey="week" 
+                      stroke="#888888" 
+                      fontSize={12} 
+                      tickLine={false} 
+                      axisLine={false} 
                     />
-                    <XAxis
-                      dataKey="week"
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={12}
-                    />
-                    <YAxis
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={12}
+                    <YAxis 
+                      stroke="#888888" 
+                      fontSize={12} 
+                      tickLine={false} 
+                      axisLine={false} 
+                      tickFormatter={(value) => `${value}`} 
                     />
                     <Tooltip contentStyle={TOOLTIP_STYLE} />
-                    <Area
-                      type="monotone"
-                      dataKey="engagement"
-                      stroke="hsl(var(--accent))"
+                    <Area 
+                      type="monotone" 
+                      dataKey="engagement" 
+                      stroke="hsl(var(--primary))" 
                       strokeWidth={2}
-                      fill="url(#engagementGradient)"
+                      fillOpacity={1} 
+                      fill="url(#colorEngagement)" 
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -371,119 +300,80 @@ export default function SocialMediaAnalysisPage() {
             </CardContent>
           </Card>
 
-          {/* POST TYPE PERFORMANCE */}
-          <Card className="lg:col-span-2">
+          {/* TOP POSTS */}
+          <Card className="md:col-span-3">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Image className="h-5 w-5 text-accent" />
-                Post Type Performance
-              </CardTitle>
-              <CardDescription>
-                Avg engagement by content type
-              </CardDescription>
+              <CardTitle>Top Performing Posts</CardTitle>
+              <CardDescription>Highest engagement content</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={analytics.postTypePerformance}>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="hsl(var(--border))"
-                    />
-                    <XAxis
-                      dataKey="type"
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={12}
-                    />
-                    <YAxis
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={12}
-                    />
-                    <Tooltip contentStyle={TOOLTIP_STYLE} />
-                    <Bar
-                      dataKey="avgEngagement"
-                      fill="hsl(var(--accent))"
-                      radius={[6, 6, 0, 0]}
-                      barSize={48}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="space-y-4">
+                {analytics.topPosts.length === 0 ? (
+                    <div className="text-center text-muted-foreground py-8">No posts yet</div>
+                ) : (
+                    analytics.topPosts.map((post) => (
+                    <div key={post._id} className="flex items-center gap-4">
+                        <div className="h-10 w-10 rounded-md bg-muted overflow-hidden flex-shrink-0">
+                        {post.thumbnail ? (
+                            <img src={post.thumbnail} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                            <div className="h-full w-full flex items-center justify-center bg-gray-100">
+                                <FileText className="h-5 w-5 text-gray-400" />
+                            </div>
+                        )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate" title={post.title}>{post.title}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                                <Heart className="h-3 w-3" /> {post.likes}
+                            </span>
+                            <span className="flex items-center gap-1">
+                                <MessageCircle className="h-3 w-3" /> {post.comments}
+                            </span>
+                        </div>
+                        </div>
+                        <PostTypeBadge type={post.type} />
+                    </div>
+                    ))
+                )}
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* TOP PERFORMING POSTS + POSTING FREQUENCY */}
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* TOP POSTS TABLE */}
-          <Card className="lg:col-span-2">
+        {/* CHARTS ROW 2 */}
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* FORMAT PERFORMANCE */}
+          <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-accent" />
-                Top Performing Posts
-              </CardTitle>
-              <CardDescription>
-                Ranked by total engagement (likes + comments)
-              </CardDescription>
+              <CardTitle>Format Performance</CardTitle>
+              <CardDescription>Average engagement by post type</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-8">#</TableHead>
-                      <TableHead>Post Title</TableHead>
-                      <TableHead className="text-center">Type</TableHead>
-                      <TableHead className="text-right">Likes</TableHead>
-                      <TableHead className="text-right">Comments</TableHead>
-                      <TableHead className="text-right">Engagement</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {analytics.topPosts.slice(0, 6).map((post, i) => (
-                      <TableRow
-                        key={post._id}
-                        className="cursor-pointer hover:bg-accent/5 transition-colors"
-                        onClick={() => navigate(`/startup/posts/${post._id}`)}
-                      >
-                        <TableCell className="font-medium text-muted-foreground">
-                          {i + 1}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            {post.thumbnail && (
-                              <img
-                                src={`${BASE_URL}${post.thumbnail}`}
-                                alt=""
-                                className="h-8 w-8 rounded object-cover shrink-0"
-                              />
-                            )}
-                            <span className="font-medium truncate max-w-[200px]">
-                              {post.title}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <PostTypeBadge type={post.type} />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {post.likes.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {post.comments.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Badge
-                            variant="outline"
-                            className="border-accent/30 text-accent"
-                          >
-                            {post.engagement.toLocaleString()}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              <div className="h-[250px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analytics.postTypePerformance} layout="vertical" margin={{ left: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="hsl(var(--border))" />
+                    <XAxis type="number" hide />
+                    <YAxis 
+                      dataKey="type" 
+                      type="category" 
+                      stroke="#888888" 
+                      fontSize={12} 
+                      tickLine={false} 
+                      axisLine={false} 
+                      width={60}
+                    />
+                    <Tooltip cursor={{fill: 'transparent'}} contentStyle={TOOLTIP_STYLE} />
+                    <Bar 
+                      dataKey="avgEngagement" 
+                      fill="hsl(var(--accent))" 
+                      radius={[0, 4, 4, 0]} 
+                      barSize={30} 
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </CardContent>
           </Card>
@@ -550,7 +440,7 @@ export default function SocialMediaAnalysisPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {analyticsLoading ? (
+                  {loading ? (
                     Array(5).fill(0).map((_, i) => (
                       <TableRow key={i}>
                         <TableCell><Skeleton className="h-4 w-48 mb-2" /><Skeleton className="h-3 w-32" /></TableCell>
@@ -563,14 +453,14 @@ export default function SocialMediaAnalysisPage() {
                         <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
                       </TableRow>
                     ))
-                  ) : analyticsPosts.length === 0 ? (
+                  ) : posts.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         You haven't posted any content yet.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    analyticsPosts.map((post) => (
+                    posts.map((post) => (
                       <TableRow key={post._id}>
                         <TableCell>
                           <div className="font-medium truncate max-w-[280px]" title={post.title || "Untitled"}>
@@ -625,8 +515,7 @@ export default function SocialMediaAnalysisPage() {
           </CardContent>
         </Card>
       </div>
-      <UpgradeModal isOpen={isUpgradeModalOpen} onClose={closeUpgradeModal} featureName={triggeredFeature || "Social Media Analysis"} />
-    </StartupLayout>
+    </AdminLayout>
   );
 }
 

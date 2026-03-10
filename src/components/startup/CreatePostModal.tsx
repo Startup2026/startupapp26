@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -117,6 +118,11 @@ export function CreatePostModal({ open, onOpenChange, onSuccess, initialData }: 
             <FileText className="h-5 w-5 text-accent" />
             {initialData ? "Edit Post" : "Create New Post"}
           </DialogTitle>
+          <DialogDescription>
+            {initialData 
+              ? "Update the details of your existing post below." 
+              : "Share announcements or news with your network."}
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-5 mt-4">

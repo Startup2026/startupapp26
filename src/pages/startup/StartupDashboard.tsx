@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AnalyticsDashboard } from "@/components/startup/AnalyticsDashboard";
-import { AdvancedJobAnalytics } from "@/components/startup/AdvancedJobAnalytics";
 import {
   Briefcase,
   Users,
@@ -17,7 +16,7 @@ import {
   FileText,
   BarChart3
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { StartupLayout } from "@/components/layouts/StartupLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,7 +28,7 @@ import { startupProfileService, StartupProfile } from "@/services/startupProfile
 import { jobService, Job } from "@/services/jobService";
 import { applicationService, Application } from "@/services/applicationService";
 import { interviewService } from "@/services/interviewService";
-import { postService, Post } from "@/services/postService";
+import { feedService, Post as FeedPost } from "@/services/feedService";
 import { useAuth } from "@/contexts/AuthContext";
 import { API_BASE_URL } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -40,12 +39,10 @@ import { formatDistanceToNow } from "date-fns";
 export default function StartupDashboard() {
   const { 
     hasAccess, 
-    getFeatureValue, 
     isUpgradeModalOpen, 
     closeUpgradeModal, 
     triggeredFeature, 
-    loading: planLoading,
-    checkAccessAndShowModal 
+    loading: planLoading
   } = usePlanAccess();
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [postModalOpen, setPostModalOpen] = useState(false);
@@ -53,22 +50,32 @@ export default function StartupDashboard() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [interviews, setInterviews] = useState<any[]>([]);
-  const [myPosts, setMyPosts] = useState<Post[]>([]);
+  const [myPosts, setMyPosts] = useState<FeedPost[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
   const BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 
+  const navigate = useNavigate();
   useEffect(() => {
     const fetchData = async () => {
-      if (planLoading) return; // Wait for plan to load
-      
+      if (planLoading) return;
       try {
-        setLoading(true);
-        // 1. Fetch Profile
-        const profileResult = await startupProfileService.getMyProfile();
+        const [
+          profileResult,
+          jobsResult,
+          applicationsResult,
+          interviewsResult,
+          myPostsResult,
+        ] = await Promise.all([
+          startupProfileService.getMyProfile(),
+          jobService.getAllJobs(),
+          applicationService.getAllApplications(),
+          interviewService.getAllInterviews(),
+          feedService.getMyPosts("latest"),
+        ]);
+
         let currentProfile: StartupProfile | null = null;
-        
         if (profileResult.success && profileResult.data) {
           setProfile(profileResult.data);
           currentProfile = profileResult.data;
@@ -76,68 +83,46 @@ export default function StartupDashboard() {
           console.error("Failed to fetch profile:", profileResult.error);
         }
 
-        if (currentProfile) {
-          // 2. Fetch Jobs
-          const jobsResult = await jobService.getAllJobs();
-          let myJobs: Job[] = [];
-          if (jobsResult.success && jobsResult.data) {
-            // Filter jobs for this startup
-            myJobs = jobsResult.data.filter(job => {
-                if (typeof job.startupId === 'object' && job.startupId !== null) {
-                    return job.startupId._id === currentProfile?._id;
-                }
-                return job.startupId === currentProfile?._id;
-            });
-            setJobs(myJobs);
-          }
-
-          // 3. Fetch Applications
-          const appsResult = await applicationService.getAllApplications();
-          if (appsResult.success && appsResult.data) {
-             // Filter applications for my jobs
-             const myApps = appsResult.data.filter(app => {
-                 const appJobId = typeof app.jobId === 'object' ? app.jobId._id : app.jobId;
-                 return myJobs.some(job => job._id === appJobId);
-             });
-             setApplications(myApps);
-          }
-
-          // 4. Fetch Interviews (Gated)
-          if (hasAccess("interviewCalendar")) {
-            try {
-              const invResult = await interviewService.getAllInterviews();
-              if (invResult.success && invResult.data) {
-                 setInterviews(invResult.data as any[]);
-              }
-            } catch (invErr) {
-              console.warn("Could not fetch interviews:", invErr);
-            }
-          } else {
-            setInterviews([]); // Default to empty if no access
-          }
-
-          // 5. Fetch Posts
-          try {
-             // We need to implement getStartupPosts in postService
-             // Assuming endpoint is '/posts/get-startup-posts'
-             const postsRes = await postService.getStartupPosts();
-             if (postsRes.success && postsRes.data) {
-                setMyPosts(postsRes.data);
-             }
-          } catch (postErr) {
-             console.warn("Could not fetch posts:", postErr);
-          }
+        if (jobsResult?.success) {
+          setJobs(Array.isArray(jobsResult.data) ? jobsResult.data : []);
+        } else {
+          setJobs([]);
+          console.error("Failed to fetch jobs:", jobsResult?.error);
         }
 
+        if (applicationsResult?.success) {
+          setApplications(Array.isArray(applicationsResult.data) ? applicationsResult.data : []);
+        } else {
+          setApplications([]);
+          console.error("Failed to fetch applications:", applicationsResult?.error);
+        }
+
+        if (interviewsResult?.success) {
+          setInterviews(Array.isArray(interviewsResult.data) ? interviewsResult.data : []);
+        } else {
+          setInterviews([]);
+          console.error("Failed to fetch interviews:", interviewsResult?.error);
+        }
+
+        if (myPostsResult.success && myPostsResult.data) {
+          setMyPosts(myPostsResult.data);
+        } else {
+          setMyPosts([]);
+          console.error("Failed to fetch posts:", myPostsResult.error);
+        }
+
+        // Profile already exists at this point; layout handles onboarding redirects when needed.
+        if (currentProfile) {
+          // ...existing code...
+        }
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       } finally {
         setLoading(false);
       }
     };
-
     fetchData();
-  }, [profileModalOpen, planLoading, hasAccess]); 
+  }, [profileModalOpen, planLoading, hasAccess, navigate]);
 
   const getInitials = (name?: string | null) => {
     if (!name || typeof name !== "string") {
@@ -154,11 +139,32 @@ export default function StartupDashboard() {
       .slice(0, 2);
   };
 
+  const getEntityId = (value: any): string => {
+    if (!value) return "";
+    if (typeof value === "string") return value;
+    if (typeof value === "object") {
+      return value._id?.toString?.() || "";
+    }
+    return "";
+  };
+
+  const startupProfileId = getEntityId(profile?._id);
+  const startupJobs = jobs.filter((job) => getEntityId((job as any).startupId) === startupProfileId);
+  const startupJobIds = new Set(startupJobs.map((job) => getEntityId(job._id)));
+  const startupApplications = applications.filter((app) => {
+    const jobId = getEntityId((app as any).jobId);
+    return startupJobIds.has(jobId);
+  });
+  const startupInterviews = interviews.filter((inv: any) => {
+    const interviewJobId = getEntityId(inv?.applicationId?.jobId);
+    return startupJobIds.has(interviewJobId);
+  });
+
   // Calculate stats
-  const activeJobsCount = jobs.length;
-  const totalApplicantsCount = applications.length;
+  const activeJobsCount = startupJobs.length;
+  const totalApplicantsCount = startupApplications.length;
   const profileViewsCount = profile?.views || 0; 
-  const interviewsCount = interviews.length; 
+  const interviewsCount = startupInterviews.length; 
 
   const stats = [
     {
@@ -184,7 +190,7 @@ export default function StartupDashboard() {
     },
     {
       label: "Interviews Scheduled",
-      value: interviews.length.toString(),
+      value: startupInterviews.length.toString(),
       icon: Calendar,
       trend: "Real-time",
       color: "bg-primary/10 text-primary",
@@ -192,16 +198,16 @@ export default function StartupDashboard() {
   ];
 
   // Derive recent activity from applications
-  const recentApps = [...applications]
+  const recentApps = [...startupApplications]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 5);
   
   // Pipeline stats
-  const shortlistedCount = applications.filter(a => a.status === 'SHORTLISTED').length;
-  const rejectedCount = applications.filter(a => a.status === 'REJECTED').length;
-  const hiredCount = applications.filter(a => a.status === 'HIRED').length;
+  const shortlistedCount = startupApplications.filter(a => a.status === 'SHORTLISTED').length;
+  const rejectedCount = startupApplications.filter(a => a.status === 'REJECTED').length;
+  const hiredCount = startupApplications.filter(a => a.status === 'HIRED').length;
   // Assuming 'APPLIED' is the default new status
-  const appliedCount = applications.length; 
+  const appliedCount = startupApplications.length; 
 
   if (loading) {
       return (
@@ -264,7 +270,6 @@ export default function StartupDashboard() {
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="posts">My Posts</TabsTrigger>
             <TabsTrigger value="analytics">Hiring Summary</TabsTrigger>
-            <TabsTrigger value="advanced">Advanced Job Analytics</TabsTrigger>
           </TabsList>
 
 
@@ -397,10 +402,10 @@ export default function StartupDashboard() {
                 </Link>
               </CardHeader>
               <CardContent className="space-y-3">
-                {jobs.length === 0 ? (
+                {startupJobs.length === 0 ? (
                      <p className="text-muted-foreground text-center py-4">No active jobs posted.</p>
                 ) : (
-                    jobs.slice(0, 3).map((job) => (
+                  startupJobs.slice(0, 3).map((job) => (
                     <Link
                         key={job._id}
                         to={`/startup/jobs/${job._id}/applications`}
@@ -413,8 +418,7 @@ export default function StartupDashboard() {
                         <div className="flex items-center justify-between text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                             <Users className="h-3 w-3" />
-                             {/* Calculate applicant count for this specific job */}
-                             {applications.filter(a => (typeof a.jobId === 'object' ? a.jobId._id : a.jobId) === job._id).length} applicants
+                           {startupApplications.filter((a) => getEntityId((a as any).jobId) === getEntityId(job._id)).length} applicants
                         </span>
                         <span>{formatDistanceToNow(new Date(job.createdAt), { addSuffix: true })}</span>
                         </div>
@@ -437,12 +441,12 @@ export default function StartupDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-               {interviews.length === 0 ? (
+                 {startupInterviews.length === 0 ? (
                    <p className="text-muted-foreground text-center py-8">
                        No interviews scheduled.
                    </p>
                ) : (
-                   interviews.slice(0, 3).map((inv: any) => (
+                   startupInterviews.slice(0, 3).map((inv: any) => (
                        <div key={inv._id} className="flex items-center gap-4 p-3 rounded-lg border border-border">
                            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center font-bold text-primary">
                                 {new Date(inv.interviewDate).getDate()}
@@ -526,7 +530,7 @@ export default function StartupDashboard() {
                   Create New Post
                 </Button>
               </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <CardContent className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-5">
                 {myPosts.length === 0 ? (
                   <div className="col-span-full py-12 text-center text-muted-foreground border-2 border-dashed rounded-xl">
                     <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -535,24 +539,35 @@ export default function StartupDashboard() {
                   </div>
                 ) : (
                   myPosts.map((post) => (
-                    <div key={post._id} className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full bg-card">
-                      {/* Image - Correctly constructed URL */}
-                      {post.media?.photo && (
-                        <div className="w-full aspect-video bg-muted relative group">
-                            <img
+                    <div key={post._id} className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow flex flex-col bg-card">
+                      {/* Media preview (video first, then image) */}
+                      {post.media?.video ? (
+                        <div className="w-full h-40 sm:h-36 lg:h-40 bg-muted relative">
+                          <video
+                            src={`${BASE_URL}${post.media.video}`}
+                            className="w-full h-full object-cover"
+                            controls
+                            preload="metadata"
+                            playsInline
+                          >
+                            Your browser does not support video playback.
+                          </video>
+                        </div>
+                      ) : post.media?.photo ? (
+                        <div className="w-full h-40 sm:h-36 lg:h-40 bg-muted relative group">
+                          <img
                             src={`${BASE_URL}${post.media.photo}`}
                             alt={post.title || "Post image"}
                             className="w-full h-full object-cover transition-transform group-hover:scale-105"
                             onError={(e) => {
-                                // Hide broken images but keep the layout stable if possible
-                                (e.target as HTMLImageElement).src = 'https://placehold.co/600x400?text=Image+Unavailable';
+                              (e.target as HTMLImageElement).src = 'https://placehold.co/600x400?text=Image+Unavailable';
                             }}
-                            />
+                          />
                         </div>
-                      )}
+                      ) : null}
                       
-                      <div className="p-4 flex flex-col flex-1">
-                        <div className="flex items-center justify-between mb-2">
+                      <div className="p-3 sm:p-4 flex flex-col">
+                        <div className="flex items-center justify-between mb-1.5">
                           <Badge variant="outline" className="text-xs">
                              {/* Since 'type' might be buried in the post model or inferred, just show Update */}
                              Update
@@ -562,18 +577,21 @@ export default function StartupDashboard() {
                           </span>
                         </div>
 
-                        <h3 className="font-bold text-lg mb-2 line-clamp-2">{post.title || "Untitled"}</h3>
-                        <p className="text-muted-foreground text-sm line-clamp-3 mb-4 flex-1">
+                        <h3 className="font-bold text-base sm:text-lg mb-1.5 line-clamp-1">{post.title || "Untitled"}</h3>
+                        <p className="text-muted-foreground text-sm line-clamp-2 mb-3">
                           {post.description}
                         </p>
 
-                        <div className="flex items-center justify-between pt-4 border-t mt-auto text-xs text-muted-foreground">
-                          <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-between pt-3 border-t text-xs text-muted-foreground">
+                          <div className="flex items-center gap-2.5 sm:gap-3">
                              <span className="flex items-center gap-1">
-                               <Users className="h-3 w-3" /> {post.likes?.length || 0}
+                               <Eye className="h-3 w-3" /> {post.analytics?.views_count || 0}
                              </span>
                              <span className="flex items-center gap-1">
-                               <FileText className="h-3 w-3" /> {post.comments?.length || 0}
+                               <Users className="h-3 w-3" /> {post.analytics?.likes_count || 0}
+                             </span>
+                             <span className="flex items-center gap-1">
+                               <FileText className="h-3 w-3" /> {post.analytics?.comments_count || 0}
                              </span>
                           </div>
                           {/* Could add Edit/Delete here later */}
@@ -593,9 +611,9 @@ export default function StartupDashboard() {
               <div className="flex flex-col items-center justify-center p-12 border rounded-xl bg-muted/30">
                 <BarChart3 className="h-12 w-12 text-muted-foreground mb-4" />
                 <h3 className="text-xl font-bold mb-2">Analytics Restricted</h3>
-                <p className="text-muted-foreground mb-6 max-w-md text-center">
-                   Basic analytics is only available in GROWTH, PRO, and ENTERPRISE plans.
-                </p>
+                 <p className="text-muted-foreground mb-6 max-w-md text-center">
+                   Analytics unlocks on the Sprint, Builder, and Partner plans.
+                 </p>
                 <Link to="/startup/select-plan">
                   <Button>Upgrade Plan</Button>
                 </Link>
@@ -603,22 +621,6 @@ export default function StartupDashboard() {
             )}
           </TabsContent>
 
-          <TabsContent value="advanced">
-            {["advanced", "full", "custom"].includes(getFeatureValue("analytics") as string) ? (
-              <AdvancedJobAnalytics />
-            ) : (
-              <div className="flex flex-col items-center justify-center p-12 border rounded-xl bg-muted/30">
-                <TrendingUp className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-xl font-bold mb-2">Advanced Analytics Restricted</h3>
-                <p className="text-muted-foreground mb-6 max-w-md text-center">
-                   Advanced job analytics is available in PRO and ENTERPRISE plans.
-                </p>
-                <Link to="/startup/select-plan">
-                  <Button>Upgrade Plan</Button>
-                </Link>
-              </div>
-            )}
-          </TabsContent>
         </Tabs>
       </div>
 

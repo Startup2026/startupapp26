@@ -35,7 +35,7 @@ const AdvancedAnalysisPage = () => {
             <div className="max-w-md space-y-2">
               <h2 className="text-xl font-bold">Pro Feature Locked</h2>
               <p className="text-muted-foreground">
-                Statistical hiring velocity and interview yield metrics are available on Pro and Enterprise plans.
+                Statistical hiring velocity and interview yield metrics are available on the Builder and Partner plans.
               </p>
             </div>
             <Button onClick={() => navigate("/startup/select-plan")}>

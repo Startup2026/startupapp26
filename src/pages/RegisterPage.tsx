@@ -15,7 +15,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
-type UserRole = "student" | "startup";
+type UserRole = "student" | "startup" | "incubator_admin";
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
@@ -36,12 +36,12 @@ export default function RegisterPage() {
 
     if (result.success) {
       toast({
-        title: "Verification email sent",
-        description: "Please check your inbox and verify your email before logging in.",
+        title: "Registration successful",
+        description: "Your account has been created. Please check your email.",
       });
 
-      // Take user to a verification pending page with resend option
-      navigate('/verify-pending', { state: { email, role } });
+      // Redirect to verification pending page
+      navigate('/verify-pending', { state: { email } });
     } else {
       toast({
         title: "Registration failed",
@@ -122,18 +122,19 @@ export default function RegisterPage() {
                 <SelectContent className="bg-card border-border">
                   <SelectItem value="student">Student</SelectItem>
                   <SelectItem value="startup">Startup</SelectItem>
+                  <SelectItem value="incubator_admin">Incubator Admin</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="name">{role === "student" ? "Full Name" : "Company Name"}</Label>
+              <Label htmlFor="name">{role === "student" ? "Full Name" : role === "startup" ? "Company Name" : "Incubator Name"}</Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
                   id="name"
                   type="text"
-                  placeholder={role === "student" ? "John Doe" : "Acme Inc."}
+                  placeholder={role === "student" ? "John Doe" : role === "startup" ? "Acme Inc." : "Tech Incubator"}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="pl-10 h-12"

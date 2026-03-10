@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   Users,
   Building2,
@@ -6,61 +7,73 @@ import {
   Activity,
   ArrowUpRight,
   ArrowDownRight,
+  IndianRupee,
 } from "lucide-react";
 import { AdminLayout } from "@/components/layouts/AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-
-const stats = [
-  {
-    label: "Total Startups",
-    value: "524",
-    change: "+12",
-    trend: "up",
-    icon: Building2,
-    color: "bg-accent/10 text-accent",
-  },
-  {
-    label: "Total Students",
-    value: "12,847",
-    change: "+234",
-    trend: "up",
-    icon: Users,
-    color: "bg-success/10 text-success",
-  },
-  {
-    label: "Active Job Posts",
-    value: "1,892",
-    change: "+67",
-    trend: "up",
-    icon: Briefcase,
-    color: "bg-warning/10 text-warning",
-  },
-  {
-    label: "Applications Today",
-    value: "342",
-    change: "-12",
-    trend: "down",
-    icon: Activity,
-    color: "bg-destructive/10 text-destructive",
-  },
-];
-
-const recentActivity = [
-  { id: 1, action: "New startup registered", entity: "CloudNine", type: "startup", time: "2 min ago" },
-  { id: 2, action: "Job post flagged", entity: "Marketing Role at XYZ", type: "moderation", time: "15 min ago" },
-  { id: 3, action: "New student signup", entity: "John Doe", type: "user", time: "30 min ago" },
-  { id: 4, action: "Startup verified", entity: "TechFlow AI", type: "verification", time: "1 hour ago" },
-  { id: 5, action: "Job post approved", entity: "Frontend Dev at ABC", type: "approval", time: "2 hours ago" },
-];
-
-const pendingVerifications = [
-  { id: 1, name: "InnovateTech", domain: "SaaS", submitted: "2 days ago" },
-  { id: 2, name: "GreenGrow", domain: "AgriTech", submitted: "3 days ago" },
-  { id: 3, name: "MediCare Plus", domain: "HealthTech", submitted: "5 days ago" },
-];
+import { apiFetch } from "@/lib/api";
 
 export default function AdminDashboard() {
+  const [revenueStats, setRevenueStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchRevenue() {
+      const response = await apiFetch('/payment/admin/revenue-summary');
+      if (response.success) {
+        setRevenueStats(response.data);
+      }
+      setLoading(false);
+    }
+    fetchRevenue();
+  }, []);
+
+  const stats = [
+    {
+      label: "Wostup Platform Revenue",
+      value: loading ? "..." : `₹${revenueStats?.platformShare?.toLocaleString() || 0}`,
+      subtext: "After 2% fee & 10% Incubation",
+      icon: IndianRupee,
+      color: "bg-primary/10 text-primary",
+    },
+    {
+      label: "Total Startup Revenue (Net)",
+      value: loading ? "..." : `₹${revenueStats?.netRevenue?.toLocaleString() || 0}`,
+      subtext: "Wostup Fee + Incubator Share",
+      icon: TrendingUp,
+      color: "bg-success/10 text-success",
+    },
+    {
+      label: "Incubator Share (10%)",
+      value: loading ? "..." : `₹${revenueStats?.incubatorShare?.toLocaleString() || 0}`,
+      subtext: "Total distributed to incubators",
+      icon: Building2,
+      color: "bg-accent/10 text-accent",
+    },
+    {
+      label: "Gateway Fees (2%)",
+      value: loading ? "..." : `₹${revenueStats?.gatewayFees?.toLocaleString() || 0}`,
+      subtext: "Paid to Razorpay",
+      icon: Activity,
+      color: "bg-warning/10 text-warning",
+    },
+  ];
+
+  const recentActivity = [
+    { id: 1, action: "New startup registered", entity: "CloudNine", type: "startup", time: "2 min ago" },
+    { id: 2, action: "Job post flagged", entity: "Marketing Role at XYZ", type: "moderation", time: "15 min ago" },
+    { id: 3, action: "New student signup", entity: "John Doe", type: "user", time: "30 min ago" },
+    { id: 4, action: "Startup verified", entity: "TechFlow AI", type: "verification", time: "1 hour ago" },
+    { id: 5, action: "Job post approved", entity: "Frontend Dev at ABC", type: "approval", time: "2 hours ago" },
+  ];
+
+  const pendingVerifications = [
+    { id: 1, name: "InnovateTech", domain: "SaaS", submitted: "2 days ago" },
+    { id: 2, name: "GreenGrow", domain: "AgriTech", submitted: "3 days ago" },
+    { id: 3, name: "MediCare Plus", domain: "HealthTech", submitted: "5 days ago" },
+  ];
+
   return (
     <AdminLayout>
       <div className="p-6 lg:p-8 space-y-8 animate-fade-in">
@@ -81,17 +94,10 @@ export default function AdminDashboard() {
                   <div className={`h-12 w-12 rounded-xl ${stat.color} flex items-center justify-center`}>
                     <stat.icon className="h-6 w-6" />
                   </div>
-                  <div className={`flex items-center gap-1 text-sm ${stat.trend === "up" ? "text-success" : "text-destructive"}`}>
-                    {stat.trend === "up" ? (
-                      <ArrowUpRight className="h-4 w-4" />
-                    ) : (
-                      <ArrowDownRight className="h-4 w-4" />
-                    )}
-                    {stat.change}
-                  </div>
                 </div>
                 <p className="text-3xl font-bold mt-4">{stat.value}</p>
-                <p className="text-muted-foreground text-sm mt-1">{stat.label}</p>
+                <p className="text-muted-foreground text-sm mt-1 font-semibold">{stat.label}</p>
+                {stat.subtext && <p className="text-xs text-muted-foreground mt-1 opacity-70">{stat.subtext}</p>}
               </CardContent>
             </Card>
           ))}

@@ -18,6 +18,7 @@ interface JobApplicationModalProps {
     id: number | string;
     title: string;
     company: string;
+    deadline?: string;
   };
 }
 
@@ -30,6 +31,14 @@ export function JobApplicationModal({
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [storedResumeUrl, setStoredResumeUrl] = useState<string | null>(null);
+
+  const isDeadlinePassed = (() => {
+    if (!job.deadline) return false;
+    const deadlineDate = new Date(job.deadline);
+    if (Number.isNaN(deadlineDate.getTime())) return false;
+    deadlineDate.setHours(23, 59, 59, 999);
+    return deadlineDate < new Date();
+  })();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -50,6 +59,15 @@ export function JobApplicationModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isDeadlinePassed) {
+      toast({
+        title: "Deadline passed",
+        description: "Applications for this job are closed.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (!resumeFile && !storedResumeUrl) {
         toast({ title: "Resume Required", description: "Please upload a resume or set one in your profile.", variant: "destructive" });
         return;
@@ -122,6 +140,12 @@ export function JobApplicationModal({
               </DialogDescription>
             </DialogHeader>
 
+            {isDeadlinePassed && (
+              <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                Application deadline has passed for this job.
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-6 mt-4">
               {/* Stored Resume Notice */}
               {storedResumeUrl && !resumeFile && (
@@ -169,7 +193,7 @@ export function JobApplicationModal({
                 <Button type="button" variant="outline" className="flex-1" onClick={handleClose}>
                   Cancel
                 </Button>
-                <Button type="submit" variant="hero" className="flex-1" disabled={isSubmitting || (!resumeFile && !storedResumeUrl)}>
+                <Button type="submit" variant="hero" className="flex-1" disabled={isSubmitting || (!resumeFile && !storedResumeUrl) || isDeadlinePassed}>
                   {isSubmitting ? (
                     "Submitting..."
                   ) : (

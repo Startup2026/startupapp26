@@ -40,16 +40,14 @@ export default function NotificationsPage() {
         const exists = prev.some((n) => n._id === notification._id);
         return exists ? prev : [notification, ...prev];
       });
-
-      // Toast is already handled in Layout, but we can do it here too if not in layout
-      // Or just rely on Layout's toast to avoid duplicates if user is on this page.
-      // But user typically wants to see the list update visibly.
     };
 
     socket.on("notification", handleNotification);
+    socket.on("new_notification", handleNotification);
 
     return () => {
       socket.off("notification", handleNotification);
+      socket.off("new_notification", handleNotification);
     };
   }, [socket, toast]);
 

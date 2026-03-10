@@ -58,6 +58,18 @@ interface Comment {
   text: string;
 }
 
+const getCommentDisplayName = (commentUser: any) => {
+  if (!commentUser) return "User";
+  if (typeof commentUser === "string") return "User";
+
+  const fullName = [commentUser.firstName || commentUser.firstname, commentUser.lastName || commentUser.lastname]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  return fullName || commentUser.username || commentUser.name || commentUser.email || "User";
+};
+
 interface FeedPost {
   id: string;
   type: "update" | "event" | "promotion";
@@ -139,7 +151,7 @@ export default function StartupFeedPage() {
       try {
         let endpoint = `/recommendations/cold-start/posts?limit=5&page=${page}`;
         if (user?._id) {
-          endpoint = `/recommendations/posts/${user._id}?limit=5&page=${page}&random=true`;
+          endpoint = `/recommendations/posts/${user._id}?limit=5&page=${page}`;
         }
 
         const res = await apiFetch(endpoint);
@@ -149,15 +161,27 @@ export default function StartupFeedPage() {
           if (transformedData.length === 0) {
             setHasMore(false);
           } else {
+            let uniqueAddedCount = 0;
             setPosts(prev => {
-                const newPosts = page === 1 ? transformedData : [...prev, ...transformedData];
-                // Use a Map to ensure uniqueness by ID
+              if (page === 1) {
                 const uniquePostsMap = new Map<string, FeedPost>();
-                newPosts.forEach(post => {
+                transformedData.forEach(post => {
                   if (post.id) uniquePostsMap.set(post.id, post);
                 });
+                uniqueAddedCount = uniquePostsMap.size;
                 return Array.from(uniquePostsMap.values());
+              }
+
+              const existingIds = new Set(prev.map((p) => p.id));
+              const uniqueIncoming = transformedData.filter((p) => p.id && !existingIds.has(p.id));
+              uniqueAddedCount = uniqueIncoming.length;
+
+              return uniqueIncoming.length > 0 ? [...prev, ...uniqueIncoming] : prev;
             });
+
+            if (page > 1 && uniqueAddedCount === 0) {
+              setHasMore(false);
+            }
           }
         } else {
           console.error("Failed to load feed:", res.message);
@@ -689,9 +713,7 @@ export default function StartupFeedPage() {
                       <div className="flex-1 bg-secondary/50 p-3 rounded-lg">
                         <div className="flex items-center justify-between mb-1">
                           <span className="font-semibold text-xs opacity-70">
-                            {typeof comment.user === 'object' 
-                              ? (comment.user.username || comment.user.name || 'User') 
-                              : 'User'}
+                            {getCommentDisplayName(comment.user)}
                           </span>
                           
                           {user && (typeof comment.user === 'string' 

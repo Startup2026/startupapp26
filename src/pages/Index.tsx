@@ -27,6 +27,7 @@ import {
   Lock,
   ChevronRight,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Logo } from "@/components/Logo";
@@ -62,6 +63,77 @@ function FadeIn({ children, className = "", delay = 0 }: { children: React.React
     </div>
   );
 }
+
+type StartupPlanCard = {
+  name: string;
+  title: string;
+  durationLabel: string;
+  totalPriceINR: number;
+  effectiveMonthlyINR?: number;
+  description: string;
+  Icon: LucideIcon;
+  iconBg: string;
+  iconColor: string;
+  ctaLabel: string;
+  recommended?: boolean;
+};
+
+const SHARED_STARTUP_FEATURES = [
+  "Unlimited active jobs",
+  "Full analytics dashboard",
+  "Bulk email outreach",
+  "Advanced job analysis",
+  "Interview scheduler",
+  "Social recruiter suite",
+  "Priority support",
+];
+
+const formatINR = (amount: number) =>
+  new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(amount);
+
+const STARTUP_PLANS: StartupPlanCard[] = [
+  {
+    name: "SPRINT_3MO",
+    title: "Sprint · 3 Months",
+    durationLabel: "3-Month Hiring Cycle",
+    totalPriceINR: 999,
+    effectiveMonthlyINR: 333,
+    description: "All platform features for a focused 3-month sprint.",
+    Icon: Rocket,
+    iconBg: "bg-blue-500/10",
+    iconColor: "text-blue-500",
+    ctaLabel: "Start Sprint Cycle",
+  },
+  {
+    name: "BUILDER_6MO",
+    title: "Builder · 6 Months",
+    durationLabel: "Most Popular",
+    totalPriceINR: 1999,
+    effectiveMonthlyINR: 333,
+    description: "Same full feature access with a longer 6-month cycle.",
+    Icon: Zap,
+    iconBg: "bg-amber-500/10",
+    iconColor: "text-amber-600",
+    ctaLabel: "Scale with Builder",
+    recommended: true,
+  },
+  {
+    name: "PARTNER_12MO",
+    title: "Partner · 12 Months",
+    durationLabel: "12-Month Hiring Cycle",
+    totalPriceINR: 2999,
+    effectiveMonthlyINR: 250,
+    description: "Full feature access with the best value annual cycle.",
+    Icon: ShieldCheck,
+    iconBg: "bg-purple-500/10",
+    iconColor: "text-purple-600",
+    ctaLabel: "Partner with Wostup",
+  },
+];
 
 const Index = () => {
 
@@ -420,39 +492,37 @@ const Index = () => {
             </div>
           </FadeIn>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto items-start">
-            
-            {/* 1. STUDENT */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto items-start">
             <FadeIn delay={0}>
               <Card className="flex flex-col h-full border-border/50 hover:border-accent/30 transition-all duration-300 hover:shadow-lg">
                 <CardHeader className="pb-8">
                   <div className="inline-flex p-2.5 rounded-xl bg-secondary mb-5 w-fit">
                     <Users className="h-5 w-5 text-muted-foreground" />
                   </div>
-                  <CardTitle className="text-xl font-bold mb-2">Student</CardTitle>
+                  <CardTitle className="text-xl font-bold mb-2">Student Access</CardTitle>
                   <CardDescription className="text-base min-h-[48px]">
-                    Build your career profile and access verified startup jobs.
+                    Build your portfolio, verify your profile, and apply with confidence.
                   </CardDescription>
                   <div className="mt-6 flex items-baseline gap-1">
                     <span className="text-4xl font-bold tracking-tight">₹0</span>
                   </div>
-                  <p className="text-xs font-medium text-muted-foreground mt-2">For ambitious builders only.</p>
+                  <p className="text-xs font-medium text-muted-foreground mt-2">Free forever for ambitious builders.</p>
                 </CardHeader>
                 <CardContent className="flex-grow">
                   <ul className="space-y-4">
                     {[
                       "Apply to verified startups",
-                      "Profile visibility to startups",
-                      "Limited applications per week",
+                      "Profile visibility to startup hiring teams",
+                      "Limited applications per week for focus",
                       "Early access to Trust Score",
                     ].map((f) => (
                       <li key={f} className="flex gap-3 text-sm text-foreground/80">
                         <div className="mt-0.5">
-                           {f.includes("Trust Score") ? (
-                             <Clock className="h-4 w-4 text-warning" />
-                           ) : (
-                             <CheckCircle className="h-4 w-4 text-primary" />
-                           )}
+                          {f.includes("Trust Score") ? (
+                            <Clock className="h-4 w-4 text-warning" />
+                          ) : (
+                            <CheckCircle className="h-4 w-4 text-primary" />
+                          )}
                         </div>
                         <span>
                           {f} {f.includes("Trust Score") && <span className="text-[10px] uppercase font-bold text-warning ml-1">(Coming Soon)</span>}
@@ -471,97 +541,70 @@ const Index = () => {
               </Card>
             </FadeIn>
 
-            {/* 2. STARTUP - Early Builder (Recommended) */}
-            <FadeIn delay={100}>
-              <Card className="flex flex-col h-full border-primary ring-2 ring-primary ring-offset-2 shadow-2xl relative md:-mt-8 z-10 bg-card">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-primary-foreground px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-md whitespace-nowrap">
-                  Early Access Offer
-                </div>
-                <CardHeader className="pb-8">
-                  <div className="inline-flex p-2.5 rounded-xl bg-accent/10 mb-5 w-fit">
-                    <BadgeCheck className="h-5 w-5 text-accent" />
-                  </div>
-                  <CardTitle className="text-xl font-bold mb-2 text-accent">Early Builder</CardTitle>
-                  <CardDescription className="text-base min-h-[48px]">
-                    Everything you need to hire your founding team.
-                  </CardDescription>
-                  <div className="mt-6 flex items-baseline gap-1">
-                    <span className="text-5xl font-bold tracking-tight">₹999</span>
-                    <span className="text-muted-foreground ml-1 font-medium">/month</span>
-                  </div>
-                  <p className="text-xs font-medium text-accent mt-2">Special pricing. Will increase after launch.</p>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <ul className="space-y-4">
-                    {[
-                      "Startup verification badge",
-                      "Up to 5 active job posts",
-                      "100 applicants per job",
-                      "Interview scheduling dashboard",
-                      "Basic hiring analytics",
-                      "Early adopter badge on profile",
-                    ].map((f) => (
-                      <li key={f} className="flex gap-3 text-sm font-semibold text-foreground">
-                        <CheckCircle className="h-4 w-4 text-accent shrink-0 mt-0.5" />
-                        <span>{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-                <CardFooter>
-                  <Link to="/register?role=startup" className="w-full">
-                    <Button className="w-full h-12 rounded-xl bg-accent hover:bg-accent/90 text-accent-foreground font-bold shadow-lg transition-transform hover:scale-[1.02] text-sm">
-                      Start Hiring
-                    </Button>
-                  </Link>
-                </CardFooter>
-              </Card>
-            </FadeIn>
-
-            {/* 3. GROWTH */}
-            <FadeIn delay={200}>
-              <Card className="flex flex-col h-full border-border/50 hover:border-accent/30 transition-all duration-300 hover:shadow-lg">
-                <CardHeader className="pb-8">
-                  <div className="inline-flex p-2.5 rounded-xl bg-secondary mb-5 w-fit">
-                    <TrendingUp className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                  <CardTitle className="text-xl font-bold mb-2">Growth</CardTitle>
-                  <CardDescription className="text-base min-h-[48px]">
-                    Advanced tools for teams scaling rapidly.
-                  </CardDescription>
-                  <div className="mt-6 flex items-baseline gap-1">
-                    <span className="text-4xl font-bold tracking-tight">₹2,999</span>
-                    <span className="text-muted-foreground ml-1 font-medium">/month</span>
-                  </div>
-                  <p className="text-xs font-medium text-muted-foreground mt-2">Billed annually.</p>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <ul className="space-y-4">
-                    {[
-                      "Up to 15 active jobs",
-                      "Unlimited applicants",
-                      "Advanced candidate filters",
-                      "Bulk messaging tools",
-                      "Job performance insights",
-                      "Featured job placement",
-                    ].map((f) => (
-                      <li key={f} className="flex gap-3 text-sm text-foreground/80">
-                        <CheckCircle className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                        <span>{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-                <CardFooter>
-                  <Link to="/register?role=startup" className="w-full">
-                    <Button variant="outline" className="w-full h-12 rounded-xl border-2 font-bold text-sm">
-                      Upgrade to Growth
-                    </Button>
-                  </Link>
-                </CardFooter>
-              </Card>
-            </FadeIn>
+            {STARTUP_PLANS.map((plan, idx) => (
+              <FadeIn key={plan.name} delay={(idx + 1) * 120}>
+                <Card
+                  className={`flex flex-col h-full relative ${plan.recommended
+                    ? "border-primary ring-2 ring-primary ring-offset-2 shadow-2xl bg-card"
+                    : "border-border/50 hover:border-accent/30 transition-all duration-300 hover:shadow-lg"}`}
+                >
+                  {plan.recommended && (
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-primary-foreground px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-md whitespace-nowrap">
+                      Most Popular
+                    </div>
+                  )}
+                  <CardHeader className="pb-8">
+                    <div className={`inline-flex p-2.5 rounded-xl ${plan.iconBg} mb-5 w-fit`}>
+                      <plan.Icon className={`h-5 w-5 ${plan.iconColor}`} />
+                    </div>
+                    <CardTitle className="text-xl font-bold mb-2">{plan.title}</CardTitle>
+                    <CardDescription className="text-base min-h-[48px]">
+                      {plan.description}
+                    </CardDescription>
+                    <div className="mt-6 space-y-1">
+                      <span className="text-4xl font-bold tracking-tight">{formatINR(plan.totalPriceINR)}</span>
+                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{plan.durationLabel}</span>
+                      {plan.effectiveMonthlyINR && (
+                        <p className="text-xs text-muted-foreground">Effective {formatINR(plan.effectiveMonthlyINR)}/month</p>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="flex-grow">
+                    <p className="text-sm text-foreground/80">Includes the full shared startup feature bundle.</p>
+                    <p className="text-xs text-muted-foreground mt-4">Pre-paid per hiring cycle. GST extra.</p>
+                  </CardContent>
+                  <CardFooter>
+                    <Link to="/register?role=startup" className="w-full">
+                      <Button
+                        variant={plan.recommended ? "default" : "outline"}
+                        className={`w-full h-12 rounded-xl font-bold text-sm ${plan.recommended ? "bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg" : "border-2"}`}
+                      >
+                        {plan.ctaLabel}
+                      </Button>
+                    </Link>
+                  </CardFooter>
+                </Card>
+              </FadeIn>
+            ))}
           </div>
+
+          <div className="max-w-5xl mx-auto mt-8 rounded-2xl border border-border/50 bg-card p-6">
+            <h3 className="text-lg font-bold mb-2">Included in all startup paid plans</h3>
+            <p className="text-sm text-muted-foreground mb-4">Same full features in every plan. Choose only by duration and total price.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {SHARED_STARTUP_FEATURES.map((feature) => (
+                <div key={feature} className="flex items-center gap-2 text-sm text-foreground/80">
+                  <CheckCircle className="h-4 w-4 text-primary shrink-0" />
+                  <span>{feature}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <p className="text-center text-xs text-muted-foreground mt-10">
+            All paid plans are pre-paid per hiring cycle. GST is added at checkout. Need a custom pod?{" "}
+            <a href="mailto:founders@wostup.com" className="font-semibold text-foreground">founders@wostup.com</a>
+          </p>
 
           {/* Early Access Benefits - Subtle Section Below */}
           <FadeIn delay={300}>

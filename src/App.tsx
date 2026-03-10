@@ -2,14 +2,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SocketProvider } from "@/contexts/SocketContext";
 import Index from "./pages/Index";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
-import VerifyEmailPage from "./pages/VerifyEmailPage";
-import VerifyPendingPage from "./pages/VerifyPendingPage";
+// ...existing code...
 import StudentDashboard from "./pages/student/StudentDashboard";
 import JobListingsPage from "./pages/student/JobListingsPage";
 import JobDetailsPage from "./pages/student/JobDetailsPage";
@@ -39,6 +38,8 @@ import InterviewCalendarPage from "./pages/startup/InterviewCalendarPage";
 import JobAnalysisPage from "./pages/startup/JobAnalysisPage";
 import AdvancedAnalysisPage from "./pages/startup/AdvancedAnalysisPage";
 import StartupSettingsPage from "./pages/startup/StartupSettingsPage";
+import StartupVerificationPage from "./pages/startup/StartupVerificationPage";
+// ...existing code...
 import SocialMediaAnalysisPage from "./pages/startup/SocialMediaAnalysisPage";
 import PostDetailPage from "./pages/startup/PostDetailPage";
 import StartupNotificationsPage from "./pages/startup/StartupNotificationsPage";
@@ -46,8 +47,12 @@ import TrendingJobsPage from "./pages/student/TrendingJobsPost";
 import SavedItemsPage from "./pages/student/SavePage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
-import StartupVerificationPage from "./pages/StartupVerificationPage";
-
+import VerifyEmailPage from "./pages/VerifyEmailPage";
+import IncubatorDashboard from "./pages/admin/IncubatorDashboard";
+import IncubatorSocialAnalysisPage from "./pages/admin/IncubatorSocialAnalysisPage";
+import MyPostsAnalyticsPage from "./pages/startup/MyPostsAnalyticsPage";
+import CreateIncubatorProfilePage from "./pages/admin/CreateIncubatorProfilePage";
+import IncubatorNotificationsPage from "./pages/admin/IncubatorNotificationsPage";
 
 
 const queryClient = new QueryClient();
@@ -66,8 +71,7 @@ const App = () => (
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
-            <Route path="/verify-email" element={<VerifyEmailPage />} />
-            <Route path="/verify-pending" element={<VerifyPendingPage />} />
+            {/* Removed deleted verification routes */}
             
             {/* Student routes */}
             <Route path="/student/create-profile" element={<CreateStudentProfilePage />} />
@@ -84,6 +88,8 @@ const App = () => (
             <Route path="/student/TrendingJobs" element={<TrendingJobsPage />} />
             <Route path="/student/saved" element={<SavedItemsPage />} />
             {/* Startup routes */}
+          
+            <Route path="/startup/verification" element={<StartupVerificationPage />} />
             <Route path="/startup/create-profile" element={<CreateStartupProfilePage />} />
             <Route path="/startup/select-plan" element={<SelectPlanPage />} />
             <Route path="/startup/dashboard" element={<StartupDashboard />} />
@@ -92,6 +98,7 @@ const App = () => (
             <Route path="/startup/analysis" element={<JobAnalysisPage />} />
             <Route path="/startup/advanced-analysis" element={<AdvancedAnalysisPage />} />
             <Route path="/startup/social-media-analysis" element={<SocialMediaAnalysisPage />} />
+            <Route path="/startup/posts/analytics" element={<MyPostsAnalyticsPage />} />
             <Route path="/startup/posts/:postId" element={<PostDetailPage />} />
             <Route path="/startup/interviews" element={<InterviewCalendarPage />} />
             <Route path="/startup/profile" element={<StartupProfile />} />
@@ -99,6 +106,10 @@ const App = () => (
             <Route path="/startup/selected" element={<Selected />} />
             <Route path="/startup/notifications" element={<StartupNotificationsPage />} />
             <Route path="/startup/settings" element={<StartupSettingsPage />} />
+            {/* Redirect old verify-pending to the proper email verification message page */}
+            <Route path="/verify-pending" element={<VerifyEmailPage />} />
+            <Route path="/verify-email-pending" element={<VerifyEmailPage />} />
+            {/* Removed deleted verification route */}
             
             {/* Admin routes */}
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
@@ -106,13 +117,14 @@ const App = () => (
             <Route path="/admin/users" element={<AdminUsersPage />} />
             <Route path="/admin/moderation" element={<AdminModerationPage />} />
             <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
-
-            {/* startup verification route */}
-            <Route path="/startup/verification" element={<StartupVerificationPage />} />
-            <Route path="/startup/verification-pending" element={<VerifyPendingPage />} />
+            <Route path="/incubator/dashboard" element={<IncubatorDashboard />} />
+            <Route path="/incubator/social-analysis" element={<IncubatorSocialAnalysisPage />} />
+            <Route path="/incubator/create-profile" element={<CreateIncubatorProfilePage />} />
+            <Route path="/incubator/notifications" element={<IncubatorNotificationsPage />} />
+            {/* Removed deleted verification routes */}
             
             <Route path="*" element={<NotFound />} />
-          </Routes>
+          </Routes> 
           </BrowserRouter>
         </TooltipProvider>
       </SocketProvider>

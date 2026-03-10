@@ -1,5 +1,5 @@
 import { ReactNode, useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Briefcase,
@@ -39,6 +39,7 @@ import { useSocket } from "@/contexts/SocketContext";
 import { formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlanAccess } from "@/hooks/usePlanAccess";
+import { startupProfileService } from "@/services/startupProfileService";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/startup/dashboard" },
@@ -59,6 +60,7 @@ const navItems = [
 ];
 
 export function StartupLayout({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
   const { loading: planLoading } = usePlanAccess();
@@ -66,6 +68,55 @@ export function StartupLayout({ children }: { children: ReactNode }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [notifOpen, setNotifOpen] = useState(false);
+  // Enforce Onboarding Flow: Create Profile (with verification) -> Plan -> Dashboard
+  useEffect(() => {
+    const checkOnboardingRequirements = async () => {
+      // Avoid infinite loops
+      const currentPath = location.pathname;
+      const isCreateProfilePage = currentPath === '/startup/create-profile';
+      const isPlanPage = currentPath === '/startup/select-plan';
+      const isVerificationPage = currentPath === '/startup/verification';
+      const isDashboard = currentPath === '/startup/dashboard';
+
+      // 1. Check if Profile exists
+      try {
+        const profileRes = await startupProfileService.getMyProfile();
+        if (!profileRes.success || !profileRes.data) {
+          const errorText = typeof profileRes.error === "string" ? profileRes.error.toLowerCase() : "";
+          const isMissingProfile = profileRes.status === 404 || errorText.includes("profile not found");
+
+          if (isMissingProfile) {
+            if (!isCreateProfilePage) {
+              navigate("/startup/create-profile");
+            }
+          } else {
+            console.warn("StartupLayout: profile fetch failed, leaving user on current page", profileRes);
+          }
+          return; // Stop checking further
+        }
+
+        // 2. Check Approval Status
+        if (profileRes.data.approval_status !== 'Approved') {
+           // If they are not approved, force them to the verification page
+           if (!isVerificationPage) {
+               navigate("/startup/verification");
+           }
+           return;
+        }
+
+        // 3. Check Plan Status (only if profile exists and approved)
+        const plan = profileRes.data.subscriptionPlan || 'FREE';
+        // Allow dashboard access if they have any valid plan (including FREE)
+        // Only redirect to select-plan if they explicitly haven't selected a plan yet
+        // In practice, all profiles get FREE by default, so this is mainly for edge cases
+      } catch (e) {
+        console.error("Profile/Plan check failed", e);
+      }
+    };
+
+    checkOnboardingRequirements();
+  }, [location.pathname, navigate]);
+
   const { socket } = useSocket();
 
   const handleLogout = async () => {
