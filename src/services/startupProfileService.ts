@@ -37,6 +37,10 @@ export interface StartupProfile {
   subscriptionEndDate?: string;
   eligibility_status?: string;
   approval_status?: string;
+  incubatorId?: string | { _id: string; name: string } | null;
+  incubator?: string;
+  incubator_claimed?: boolean;
+  incubator_verified?: boolean;
 }
 
 export interface CreateStartupProfileData {
@@ -81,6 +85,7 @@ export interface CreateStartupProfileData {
   incubator_claimed?: boolean;
   incubatorId?: string;
   incubator?: string;
+  incubationCode?: string;
 }
 
 export const startupProfileService = {

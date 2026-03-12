@@ -12,7 +12,6 @@ import { Logo } from "@/components/Logo";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { startupProfileService } from "@/services/startupProfileService";
-import { apiFetch } from "@/lib/api";
 import { normalizePlanName } from "@/config/planFeatures";
 
 const industries = [
@@ -80,8 +79,9 @@ interface StartupProfileFormData {
   primarily_service_based: boolean;
   product_description: string;
   incubator_claimed: boolean;
-  incubatorId: string;
-  incubator: string;
+  incubationCode: string;
+  affiliatedIncubatorName: string;
+  incubatorVerified: boolean;
 }
 
 const CURRENT_YEAR = new Date().getFullYear().toString();
@@ -133,30 +133,21 @@ const CreateStartupProfilePage = () => {
     primarily_service_based: false,
     product_description: "",
     incubator_claimed: false,
-    incubatorId: "",
-    incubator: "",
+    incubationCode: "",
+    affiliatedIncubatorName: "",
+    incubatorVerified: false,
   });
-  const [incubators, setIncubators] = useState<Array<{ _id: string; name: string }>>([]);
 
   useEffect(() => {
-    // Fetch registered incubators on mount
-    const fetchIncubators = async () => {
-      try {
-        const res: any = await apiFetch("/incubator/list");
-        if (res.success && res.data) {
-          console.log("Loaded incubators:", res.data);
-          setIncubators(res.data);
-        }
-      } catch (err) {
-        console.error("Failed to load incubators", err);
-      }
-    };
-
     const fetchExistingProfile = async () => {
       try {
         const res = await startupProfileService.getMyProfile();
         if (res.success && res.data) {
           const p = res.data;
+          const incubatorRef = (p as any).incubatorId;
+          const affiliatedIncubatorName = typeof incubatorRef === "object" && incubatorRef
+            ? incubatorRef.name || ""
+            : (p as any).incubator || "";
           setExistingProfileId(p._id);
           
           setFormData(prev => ({
@@ -216,8 +207,9 @@ const CreateStartupProfilePage = () => {
 
              // Incubation
              incubator_claimed: (p as any).incubator_claimed ?? prev.incubator_claimed,
-             incubatorId: (p as any).incubatorId || prev.incubatorId,
-             incubator: (p as any).incubator || prev.incubator
+             incubationCode: prev.incubationCode,
+             affiliatedIncubatorName,
+             incubatorVerified: (p as any).incubator_verified ?? prev.incubatorVerified,
           }));
         }
       } catch (err) {
@@ -226,7 +218,6 @@ const CreateStartupProfilePage = () => {
       }
     };
 
-    fetchIncubators();
     fetchExistingProfile();
   }, []);
 
@@ -258,6 +249,8 @@ const CreateStartupProfilePage = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const hasLockedIncubator = formData.incubatorVerified && !!formData.affiliatedIncubatorName;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log("Submitting form with data:", formData);
@@ -265,6 +258,16 @@ const CreateStartupProfilePage = () => {
 
     try {
       const toNumber = (value: string) => (value ? Number(value) : undefined);
+
+      if (formData.incubator_claimed && !hasLockedIncubator && !formData.incubationCode.trim()) {
+        toast({
+          title: "Incubation code required",
+          description: "Enter the incubation code sent to your company through Wostup mail.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
 
       const profileData = {
         userId: user?._id || "",
@@ -321,15 +324,13 @@ const CreateStartupProfilePage = () => {
 
         // Incubation Data
         incubator_claimed: formData.incubator_claimed,
-        incubatorId: formData.incubatorId !== "other" && formData.incubatorId !== "" ? formData.incubatorId : undefined,
-        incubator: formData.incubatorId === "other" ? formData.incubator : undefined,
+        incubationCode: formData.incubator_claimed ? formData.incubationCode.trim() || undefined : undefined,
       };
 
       console.log("Submitting Profile Data:", {
         original: formData,
         constructed: profileData,
-        incubatorIdRaw: formData.incubatorId,
-        incubatorIdPayload: profileData.incubatorId
+        incubationCodePayload: profileData.incubationCode,
       });
 
       let result;
@@ -1063,47 +1064,36 @@ const CreateStartupProfilePage = () => {
                   <Checkbox
                     id="incubator_claimed"
                     checked={formData.incubator_claimed}
-                    onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, incubator_claimed: !!checked }))}
+                    disabled={hasLockedIncubator}
+                    onCheckedChange={(checked) => setFormData((prev) => ({
+                      ...prev,
+                      incubator_claimed: !!checked,
+                      incubationCode: checked ? prev.incubationCode : "",
+                    }))}
                   />
-                  <Label htmlFor="incubator_claimed" className="cursor-pointer">Are you currently part of an Incubator?</Label>
+                  <Label htmlFor="incubator_claimed" className="cursor-pointer">Do you have an incubation code from Wostup?</Label>
                 </div>
 
                 {formData.incubator_claimed && (
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="incubator-select">Select Incubator</Label>
-                      <Select
-                        value={formData.incubatorId || ""}
-                        onValueChange={(value) => {
-                          console.log("Selected Incubator ID:", value);
-                          setFormData(prev => ({ ...prev, incubatorId: value }));
-                        }}
-                      >
-                        <SelectTrigger id="incubator-select">
-                          <SelectValue placeholder="Choose your incubator..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {incubators.map((inc) => (
-                            <SelectItem key={inc._id} value={inc._id}>
-                              {inc.name}
-                            </SelectItem>
-                          ))}
-                          <SelectItem value="other">Other (Not Listed)</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label htmlFor="incubationCode">Incubation Code</Label>
+                      <Input
+                        id="incubationCode"
+                        name="incubationCode"
+                        value={formData.incubationCode}
+                        onChange={handleChange}
+                        placeholder="Enter the code emailed to your company"
+                        disabled={hasLockedIncubator}
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Your incubator creates this code from its dashboard, and Wostup sends it to your company email.
+                      </p>
                     </div>
 
-                    {formData.incubatorId === "other" && (
-                      <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                        <Label htmlFor="incubator-name">Enter Incubator Name</Label>
-                        <Input
-                          id="incubator-name"
-                          name="incubator"
-                          value={formData.incubator}
-                          onChange={handleChange}
-                          placeholder="Name of the incubator/accelerator"
-                          required
-                        />
+                    {formData.affiliatedIncubatorName && (
+                      <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+                        Linked incubator: <span className="font-medium text-foreground">{formData.affiliatedIncubatorName}</span>
                       </div>
                     )}
                   </div>

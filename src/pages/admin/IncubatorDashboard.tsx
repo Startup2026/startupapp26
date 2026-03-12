@@ -13,6 +13,19 @@ import { toast } from "@/hooks/use-toast";
 import { Users, Building, DollarSign, CheckCircle, Plus, BarChart3, Loader2, XCircle, Eye } from "lucide-react";
 import { CreatePostModal } from "@/components/startup/CreatePostModal";
 
+type InvitationCodeRecord = {
+  _id: string;
+  code: string;
+  companyName: string;
+  recipientEmail: string;
+  sentAt?: string;
+  usedAt?: string | null;
+  usedByStartupId?: {
+    _id: string;
+    startupName: string;
+  } | null;
+};
+
 export default function IncubatorDashboard() {
   const [stats, setStats] = useState<any>(null);
   const [startups, setStartups] = useState<any[]>([]);
@@ -26,6 +39,12 @@ export default function IncubatorDashboard() {
   const [showAccountNumber, setShowAccountNumber] = useState(false);
   const [showIfscCode, setShowIfscCode] = useState(false);
   const [payoutMethod, setPayoutMethod] = useState<"upi" | "bank">("upi");
+  const [invitationCodes, setInvitationCodes] = useState<InvitationCodeRecord[]>([]);
+  const [inviteSubmitting, setInviteSubmitting] = useState(false);
+  const [inviteForm, setInviteForm] = useState({
+    companyName: "",
+    recipientEmail: "",
+  });
   const [payoutForm, setPayoutForm] = useState({
     upiId: "",
     bankAccountHolderName: "",
@@ -60,11 +79,12 @@ export default function IncubatorDashboard() {
     setLoading(true);
     setPayoutLoading(true);
     try {
-      const [statsRes, startupsRes, feedRes, payoutRes] = await Promise.all([
+      const [statsRes, startupsRes, feedRes, payoutRes, invitationCodesRes] = await Promise.all([
         apiFetch("/incubator/dashboard"),
         apiFetch("/incubator/startups"),
         apiFetch("/incubator/feed"),
         apiFetch("/incubator/payout-details"),
+        apiFetch("/incubator/invitation-codes"),
       ]);
 
       if (statsRes.success) setStats(statsRes.data);
@@ -86,6 +106,9 @@ export default function IncubatorDashboard() {
           branchName: payoutData.branchName || "",
         });
       }
+      if (invitationCodesRes.success && invitationCodesRes.data) {
+        setInvitationCodes(invitationCodesRes.data);
+      }
     } catch (error) {
       console.error("Failed to fetch incubator data", error);
     } finally {
@@ -96,6 +119,56 @@ export default function IncubatorDashboard() {
 
   const handlePayoutFieldChange = (field: string, value: string) => {
     setPayoutForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleInviteFieldChange = (field: "companyName" | "recipientEmail", value: string) => {
+    setInviteForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCreateIncubationCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!inviteForm.companyName.trim() || !inviteForm.recipientEmail.trim()) {
+      toast({
+        title: "Missing details",
+        description: "Company name and company email are required.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setInviteSubmitting(true);
+    try {
+      const res = await apiFetch("/incubator/invitation-codes", {
+        method: "POST",
+        body: JSON.stringify(inviteForm),
+      });
+
+      if (!res.success) {
+        toast({
+          title: "Code creation failed",
+          description: res.error || "Failed to create and email incubation code.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Incubation code sent",
+        description: `A Wostup email has been sent to ${inviteForm.recipientEmail.trim()}.`,
+      });
+      setInviteForm({ companyName: "", recipientEmail: "" });
+      await fetchDashboardData();
+    } catch (error) {
+      console.error("Failed to create incubation code", error);
+      toast({
+        title: "Code creation failed",
+        description: "Failed to create and email incubation code. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setInviteSubmitting(false);
+    }
   };
 
   const handleSavePayoutDetails = async (e: React.FormEvent) => {
@@ -343,6 +416,65 @@ export default function IncubatorDashboard() {
           </div>
 
           <div className="lg:col-span-1 space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Create Incubation Code</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <form className="space-y-4" onSubmit={handleCreateIncubationCode}>
+                  <div className="space-y-2">
+                    <Label htmlFor="companyName">Company Name</Label>
+                    <Input
+                      id="companyName"
+                      value={inviteForm.companyName}
+                      onChange={(e) => handleInviteFieldChange("companyName", e.target.value)}
+                      placeholder="Startup or company name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="recipientEmail">Company Email</Label>
+                    <Input
+                      id="recipientEmail"
+                      type="email"
+                      value={inviteForm.recipientEmail}
+                      onChange={(e) => handleInviteFieldChange("recipientEmail", e.target.value)}
+                      placeholder="founder@company.com"
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={inviteSubmitting}>
+                    {inviteSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create and Email Code"}
+                  </Button>
+                </form>
+
+                <div className="rounded-md border p-3 bg-muted/30 text-sm space-y-3">
+                  <p className="font-medium">Recent Codes</p>
+                  {invitationCodes.length === 0 ? (
+                    <p className="text-muted-foreground">No incubation codes sent yet.</p>
+                  ) : (
+                    invitationCodes.slice(0, 5).map((record) => (
+                      <div key={record._id} className="border-b pb-3 last:border-0 last:pb-0">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="font-medium">{record.companyName}</p>
+                            <p className="text-muted-foreground">{record.recipientEmail}</p>
+                          </div>
+                          <span className="text-xs font-medium text-muted-foreground">
+                            {record.usedAt ? "Used" : "Sent"}
+                          </span>
+                        </div>
+                        <p className="mt-1 font-mono text-xs text-foreground">{record.code}</p>
+                        {record.usedByStartupId?.startupName ? (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Redeemed by {record.usedByStartupId.startupName}
+                          </p>
+                        ) : null}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle>Payout Details</CardTitle>
