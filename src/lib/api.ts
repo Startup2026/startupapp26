@@ -1,8 +1,9 @@
 // src/lib/api.ts
 
 const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+const defaultApiBaseUrl = import.meta.env.PROD ? 'https://wostup.tech/api' : '/api';
 
-export const API_BASE_URL = (configuredApiBaseUrl || '/api').replace(/\/$/, '');
+export const API_BASE_URL = (configuredApiBaseUrl || defaultApiBaseUrl).replace(/\/$/, '');
 
 export const getAuthToken = (): string | null => {
   return localStorage.getItem('auth_token');

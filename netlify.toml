@@ -3,6 +3,18 @@
   command = "npm run build"
 
 [[redirects]]
+  from = "/api/*"
+  to = "https://wostup.tech/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/socket.io/*"
+  to = "https://wostup.tech/socket.io/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
