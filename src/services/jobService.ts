@@ -24,13 +24,12 @@ export interface Job {
 }
 
 export const jobService = {
-  // Add ?random=true to the endpoints
   getColdStartJobs(page = 1, limit = 10) {
-    return apiFetch(`/recommendations/cold-start/jobs?limit=${limit}&page=${page}&random=true`);
+    return apiFetch(`/recommendations/cold-start/jobs?limit=${limit}&page=${page}`);
   },
 
   getRecommendedJobs(studentId: string, page = 1, limit = 10) {
-    return apiFetch(`/recommendations/jobs/${studentId}?limit=${limit}&page=${page}&random=true`);
+    return apiFetch(`/recommendations/jobs/${studentId}?limit=${limit}&page=${page}`);
   },
 
   getAllJobs(): Promise<{ success: boolean; data?: Job[]; error?: string }> {

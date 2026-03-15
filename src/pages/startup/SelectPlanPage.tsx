@@ -9,6 +9,7 @@ import { toast } from "@/hooks/use-toast";
 import { startupProfileService } from "@/services/startupProfileService";
 import { paymentService } from "@/services/paymentService";
 import type { PlanName } from "@/config/planFeatures";
+import { PLAN_FEATURES } from "@/config/planFeatures";
 
 declare global {
   interface Window {
@@ -21,6 +22,7 @@ type PricingPlan = {
   displayName: string;
   durationLabel: string;
   durationMonths?: number;
+  originalPriceINR: number;
   totalPriceINR: number;
   effectiveMonthlyINR?: number;
   description: string;
@@ -51,9 +53,10 @@ const PLANS: PricingPlan[] = [
     displayName: "Sprint · 3 Months",
     durationLabel: "3-Month Hiring Cycle",
     durationMonths: 3,
-    totalPriceINR: 999,
-    effectiveMonthlyINR: 333,
-    description: "Full platform access for short-term hiring cycles.",
+    originalPriceINR: PLAN_FEATURES.SPRINT_3MO.originalAmount,
+    totalPriceINR: PLAN_FEATURES.SPRINT_3MO.amount,
+    effectiveMonthlyINR: Math.round(PLAN_FEATURES.SPRINT_3MO.amount / 3),
+    description: "Full platform access for short-term hiring cycles with a launching discount.",
     icon: <Rocket className="h-6 w-6 text-blue-500" />,
     recommended: false,
   },
@@ -62,9 +65,10 @@ const PLANS: PricingPlan[] = [
     displayName: "Builder · 6 Months",
     durationLabel: "Most Popular",
     durationMonths: 6,
-    totalPriceINR: 1999,
-    effectiveMonthlyINR: 333,
-    description: "Full platform access for medium-term hiring cycles.",
+    originalPriceINR: PLAN_FEATURES.BUILDER_6MO.originalAmount,
+    totalPriceINR: PLAN_FEATURES.BUILDER_6MO.amount,
+    effectiveMonthlyINR: Math.round(PLAN_FEATURES.BUILDER_6MO.amount / 6),
+    description: "Full platform access for medium-term hiring cycles with a launching discount.",
     icon: <Zap className="h-6 w-6 text-amber-500" />,
     recommended: true,
   },
@@ -73,9 +77,10 @@ const PLANS: PricingPlan[] = [
     displayName: "Partner · 12 Months",
     durationLabel: "12-Month Hiring Cycle",
     durationMonths: 12,
-    totalPriceINR: 2999,
-    effectiveMonthlyINR: 250,
-    description: "Full platform access for long-term hiring cycles.",
+    originalPriceINR: PLAN_FEATURES.PARTNER_12MO.originalAmount,
+    totalPriceINR: PLAN_FEATURES.PARTNER_12MO.amount,
+    effectiveMonthlyINR: Math.round(PLAN_FEATURES.PARTNER_12MO.amount / 12),
+    description: "Full platform access for long-term hiring cycles with a launching discount.",
     icon: <ShieldCheck className="h-6 w-6 text-purple-500" />,
     recommended: false,
   },
@@ -115,6 +120,35 @@ export default function SelectPlanPage() {
     setIsSubmitting(planName);
     try {
       const selectedPlan = PLANS.find((plan) => plan.name === planName);
+      const selectedDisplayPlan = selectedPlan || {
+        name: "FREE" as PlanName,
+        displayName: PLAN_FEATURES.FREE.displayName,
+      };
+
+      const shouldBypassPayment =
+        planName === "FREE" || !!PLAN_FEATURES[planName].paymentTemporarilyDisabled;
+
+      if (shouldBypassPayment) {
+        const directActivation = await startupProfileService.selectPlan(planName);
+        if (!directActivation.success) {
+          throw new Error(directActivation.error || "Failed to activate plan");
+        }
+
+        toast({
+          title: "Plan Activated",
+          description:
+            planName === "SPRINT_3MO"
+              ? "Sprint · 3 Months has been activated with the launching discount."
+              : `${selectedDisplayPlan.displayName} activated successfully.`,
+        });
+
+        await refreshUser();
+        setTimeout(() => {
+          navigate("/startup/dashboard");
+        }, 300);
+        return;
+      }
+
       if (!selectedPlan) {
         throw new Error("Unknown plan selected");
       }
@@ -135,9 +169,19 @@ export default function SelectPlanPage() {
       }
 
       const order = orderResponse;
+      const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID?.trim();
+
+      if (!razorpayKey) {
+        toast({
+          title: "Razorpay key missing",
+          description: "Set VITE_RAZORPAY_KEY_ID in frontend env and restart the app.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_KEY_PLACEHOLDER",
+        key: razorpayKey,
         amount: order.amount,
         currency: order.currency,
         name: "Wostup",
@@ -218,7 +262,7 @@ export default function SelectPlanPage() {
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold mb-4">Select your plan</h1>
         <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-          One shared feature bundle. Pick the duration and price that fits your hiring cycle.
+          One shared feature bundle. Each paid plan includes a launching discount.
         </p>
       </div>
 
@@ -266,10 +310,12 @@ export default function SelectPlanPage() {
               <CardTitle className="text-2xl font-bold">{plan.displayName}</CardTitle>
               <CardDescription className="min-h-[40px]">{plan.description}</CardDescription>
               <div className="mt-4 space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-wide text-green-600">Launching Discount</p>
+                <div className="text-sm text-muted-foreground line-through">{formatINR(plan.originalPriceINR)}</div>
                 <div className="text-3xl font-bold">{formatINR(plan.totalPriceINR)}</div>
                 {plan.effectiveMonthlyINR && (
                   <p className="text-xs text-muted-foreground">
-                    Effective {formatINR(plan.effectiveMonthlyINR)}/month
+                    Effective {formatINR(plan.effectiveMonthlyINR)}/month after discount
                   </p>
                 )}
               </div>

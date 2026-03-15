@@ -96,7 +96,7 @@ export function JobApplicationModal({
             setStep("success");
             toast({
               title: "Application Submitted!",
-              description: `Your application for ${job.title} at ${job.company} has been submitted. Status: ${(res.data as any)?.status}`,
+              description: `Your application for ${job.title} at ${job.company} has been submitted.`,
             });
         } else {
              toast({

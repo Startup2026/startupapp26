@@ -15,7 +15,8 @@ import {
   Bookmark,
   ArrowLeft
 } from "lucide-react";
-import { feedService, Post } from "@/services/feedService";
+import { apiFetch } from "@/lib/api";
+import { Post } from "@/services/feedService";
 import { format } from "date-fns";
 import {
   BarChart,
@@ -80,6 +81,27 @@ function getWeekLabel(dateStr: string): string {
   return startOfWeek.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+type IncubatorFeedItem = {
+  _id: string;
+  title?: string;
+  content?: string;
+  date?: string;
+  type?: string;
+  media?: {
+    photo?: string;
+    video?: string;
+  };
+  analytics?: {
+    views_count?: number;
+    unique_views_count?: number;
+    likes_count?: number;
+    comments_count?: number;
+    saves_count?: number;
+    shares_count?: number;
+    engagement_rate?: number;
+  };
+};
+
 export default function IncubatorSocialAnalysisPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,9 +114,40 @@ export default function IncubatorSocialAnalysisPage() {
   const fetchPosts = async () => {
     setLoading(true);
     try {
-      const res = await feedService.getMyPosts(filter);
+      const res = await apiFetch<IncubatorFeedItem[]>("/incubator/feed");
       if (res.success && res.data) {
-        setPosts(res.data);
+        const normalizedPosts: Post[] = res.data
+          .filter((item) => item.type === "post")
+          .map((item) => ({
+            _id: item._id,
+            title: item.title || "Untitled Post",
+            description: item.content || "",
+            media: item.media,
+            createdAt: item.date || new Date().toISOString(),
+            analytics: {
+              views_count: item.analytics?.views_count || 0,
+              unique_views_count: item.analytics?.unique_views_count || 0,
+              likes_count: item.analytics?.likes_count || 0,
+              comments_count: item.analytics?.comments_count || 0,
+              saves_count: item.analytics?.saves_count || 0,
+              shares_count: item.analytics?.shares_count || 0,
+              engagement_rate: item.analytics?.engagement_rate || 0,
+            },
+          }));
+
+        const sortedPosts = [...normalizedPosts].sort((a, b) => {
+          if (filter === "most_viewed") {
+            return (b.analytics?.views_count || 0) - (a.analytics?.views_count || 0);
+          }
+          if (filter === "most_engaged") {
+            const aEngagement = (a.analytics?.likes_count || 0) + (a.analytics?.comments_count || 0);
+            const bEngagement = (b.analytics?.likes_count || 0) + (b.analytics?.comments_count || 0);
+            return bEngagement - aEngagement;
+          }
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+
+        setPosts(sortedPosts);
       }
     } catch (error) {
       console.error("Failed to fetch posts", error);

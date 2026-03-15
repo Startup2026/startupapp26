@@ -15,6 +15,12 @@ const PaymentPage = () => {
     });
 
   const handlePayment = async () => {
+    const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID?.trim();
+    if (!razorpayKey) {
+      alert("Razorpay key missing. Set VITE_RAZORPAY_KEY_ID in frontend env.");
+      return;
+    }
+
     const res = await fetch("/api/payment/create-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -27,7 +33,7 @@ const PaymentPage = () => {
     await loadRazorpayScript();
 
     const options = {
-      key: "YOUR_RAZORPAY_KEY_ID", // replace with your Razorpay key
+      key: razorpayKey,
       amount: data.order.amount,
       currency: data.order.currency,
       order_id: data.order.id,

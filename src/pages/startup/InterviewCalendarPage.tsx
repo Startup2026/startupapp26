@@ -24,6 +24,38 @@ export default function InterviewCalendarPage() {
   const [detailPanelOpen, setDetailPanelOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const normalizeInterviewTime = (value: string | undefined) => {
+    const raw = (value || "").trim();
+    if (!raw) return "00:00";
+
+    const twentyFour = raw.match(/^(\d{1,2}):(\d{2})/);
+    if (twentyFour) {
+      const hour = Number(twentyFour[1]);
+      const minute = Number(twentyFour[2]);
+      if (!Number.isNaN(hour) && !Number.isNaN(minute)) {
+        const paddedHour = String(Math.max(0, Math.min(23, hour))).padStart(2, "0");
+        const paddedMinute = String(Math.max(0, Math.min(59, minute))).padStart(2, "0");
+        return `${paddedHour}:${paddedMinute}`;
+      }
+    }
+
+    const amPm = raw.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (amPm) {
+      let hour = Number(amPm[1]);
+      const minute = Number(amPm[2]);
+      const meridiem = amPm[3].toUpperCase();
+
+      if (meridiem === "PM" && hour < 12) hour += 12;
+      if (meridiem === "AM" && hour === 12) hour = 0;
+
+      const paddedHour = String(Math.max(0, Math.min(23, hour))).padStart(2, "0");
+      const paddedMinute = String(Math.max(0, Math.min(59, minute))).padStart(2, "0");
+      return `${paddedHour}:${paddedMinute}`;
+    }
+
+    return "00:00";
+  };
+
   const fetchInterviews = async () => {
     if (!hasAccess("interviewCalendar")) {
       setLoading(false);
@@ -50,12 +82,12 @@ export default function InterviewCalendarPage() {
              jobTitle: job?.role || "Unknown Role",
              jobId: job?._id || "",
              date: dateStr,
-             time: item.interviewTime || "00:00",
+             time: normalizeInterviewTime(item.interviewTime),
              mode: (item.mode?.toLowerCase() as "online" | "offline") || "online",
              meetingLink: item.interviewLink || "",
              location: item.location || "",
              interviewer: item.interviewer || "Me",
-             stage: "scheduled", // Default stage
+             stage: "screening", // Default stage for legacy interview rows without stage
              status: item.status || "scheduled",
              notes: item.notes || ""
            };

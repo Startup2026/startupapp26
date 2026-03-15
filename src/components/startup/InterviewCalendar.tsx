@@ -12,7 +12,7 @@ import {
   subWeeks,
   isSameMonth,
   isSameDay,
-  parseISO,
+  parse,
 } from "date-fns";
 import { ChevronLeft, ChevronRight, Video, MapPin, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -102,6 +102,34 @@ export function InterviewCalendar({ interviews, onInterviewClick }: InterviewCal
     return filteredInterviews.filter((interview) => interview.date === dateStr);
   };
 
+  const getInterviewHour = (time: string): number | null => {
+    const rawTime = (time || "").trim();
+    if (!rawTime) return null;
+
+    const twentyFourHourMatch = rawTime.match(/^(\d{1,2}):(\d{2})/);
+    if (twentyFourHourMatch) {
+      const hour = Number(twentyFourHourMatch[1]);
+      if (!Number.isNaN(hour) && hour >= 0 && hour <= 23) return hour;
+    }
+
+    const amPmMatch = parse(rawTime, "h:mm a", new Date());
+    if (!Number.isNaN(amPmMatch.getTime())) {
+      return amPmMatch.getHours();
+    }
+
+    return null;
+  };
+
+  const openDayDetails = (day: Date) => {
+    const dayInterviews = getInterviewsForDay(day);
+    setCurrentDate(day);
+    setView("day");
+
+    if (dayInterviews.length === 1) {
+      onInterviewClick(dayInterviews[0]);
+    }
+  };
+
   // Navigation handlers
   const navigatePrev = () => {
     if (view === "month") setCurrentDate(subMonths(currentDate, 1));
@@ -136,10 +164,12 @@ export function InterviewCalendar({ interviews, onInterviewClick }: InterviewCal
       days.push(
         <div
           key={day.toString()}
+          onClick={() => openDayDetails(currentDay)}
           className={cn(
-            "min-h-[120px] border-b border-r border-border p-1 md:p-2 transition-colors",
+            "min-h-[120px] border-b border-r border-border p-1 md:p-2 transition-colors cursor-pointer",
             !isCurrentMonth && "bg-muted/30",
-            isToday && "bg-accent/5"
+            isToday && "bg-accent/5",
+            "hover:bg-muted/20"
           )}
         >
           <div
@@ -149,7 +179,13 @@ export function InterviewCalendar({ interviews, onInterviewClick }: InterviewCal
               isToday && "text-accent"
             )}
           >
-            <span
+            <button
+              type="button"
+              onClick={() => openDayDetails(currentDay)}
+              className="transition-colors hover:text-foreground"
+              aria-label={`Open interviews for ${format(day, "MMMM d, yyyy")}`}
+            >
+              <span
               className={cn(
                 "inline-flex items-center justify-center w-6 h-6 rounded-full",
                 isToday && "bg-accent text-accent-foreground"
@@ -157,12 +193,16 @@ export function InterviewCalendar({ interviews, onInterviewClick }: InterviewCal
             >
               {format(day, "d")}
             </span>
+            </button>
           </div>
           <div className="space-y-1 overflow-hidden">
             {dayInterviews.slice(0, 3).map((interview) => (
               <button
                 key={interview.id}
-                onClick={() => onInterviewClick(interview)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onInterviewClick(interview);
+                }}
                 className={cn(
                   "w-full text-left text-xs p-1 rounded truncate transition-all hover:scale-[1.02]",
                   interview.mode === "online" ? "bg-accent/20 text-accent" : "bg-primary/10 text-primary"
@@ -174,9 +214,9 @@ export function InterviewCalendar({ interviews, onInterviewClick }: InterviewCal
             {dayInterviews.length > 3 && (
               <button
                 onClick={() => {
-                  setCurrentDate(currentDay);
-                  setView("day");
+                  openDayDetails(currentDay);
                 }}
+                onClickCapture={(event) => event.stopPropagation()}
                 className="text-xs text-muted-foreground hover:text-foreground"
               >
                 +{dayInterviews.length - 3} more
@@ -246,7 +286,7 @@ export function InterviewCalendar({ interviews, onInterviewClick }: InterviewCal
               </div>
               {days.map((day) => {
                 const dayInterviews = getInterviewsForDay(day).filter((i) => {
-                  const interviewHour = parseInt(i.time.split(":")[0]);
+                  const interviewHour = getInterviewHour(i.time);
                   return interviewHour === hour;
                 });
 
@@ -297,7 +337,7 @@ export function InterviewCalendar({ interviews, onInterviewClick }: InterviewCal
         <div className="max-h-[500px] overflow-y-auto">
           {hours.map((hour) => {
             const hourInterviews = dayInterviews.filter((i) => {
-              const interviewHour = parseInt(i.time.split(":")[0]);
+              const interviewHour = getInterviewHour(i.time);
               return interviewHour === hour;
             });
 

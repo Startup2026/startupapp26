@@ -25,6 +25,8 @@ import { jobService } from "@/services/jobService";
 import { applicationService } from "@/services/applicationService";
 import { startupProfileService } from "@/services/startupProfileService";
 import { format } from "date-fns";
+import { API_BASE_URL } from "@/lib/api";
+import { resolveMediaUrl } from "@/lib/media";
 
 /* ---------------- TYPES ---------------- */
 
@@ -62,6 +64,7 @@ interface Job {
 /* ---------------- COMPONENT ---------------- */
 
 export default function StartupJobDetail() {
+  const BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
@@ -375,7 +378,7 @@ export default function StartupJobDetail() {
                   className="bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                   <a
-                    href={selectedApplicant.resumeUrl.startsWith('http') ? selectedApplicant.resumeUrl : `http://localhost:3000${selectedApplicant.resumeUrl}`}
+                    href={resolveMediaUrl(BASE_URL, selectedApplicant.resumeUrl)}
                     target="_blank"
                     rel="noopener noreferrer"
                   >

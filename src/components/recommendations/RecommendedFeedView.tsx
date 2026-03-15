@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { ComponentType, ReactNode, useEffect, useRef, useState } from "react";
 import {
   Heart,
   MessageCircle,
@@ -13,9 +13,9 @@ import {
   X,
   Send,
   User,
-  Loader2
+  Loader2,
 } from "lucide-react";
-import { API_BASE_URL } from "@/lib/api";
+import { API_BASE_URL, apiFetch, getStoredUser } from "@/lib/api";
 import { CreatePostModal } from "@/components/startup/CreatePostModal";
 import {
   DropdownMenu,
@@ -23,18 +23,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { StudentLayout } from "@/components/layouts/StudentLayout";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Textarea as UiTextarea } from "@/components/ui/textarea";
-
-// Remove this debug log
-// console.log("Textarea imported:", UiTextarea);
-
-import { apiFetch, getStoredUser } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -46,30 +40,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-// --- Interfaces ---
-
 interface Comment {
   _id: string;
-  user: { 
-    _id: string; 
-    name?: string; 
-    username?: string; 
-    avatar?: string 
+  user: {
+    _id: string;
+    name?: string;
+    username?: string;
+    avatar?: string;
   };
   text: string;
 }
-
-const getCommentDisplayName = (commentUser: any) => {
-  if (!commentUser) return "User";
-  if (typeof commentUser === "string") return "User";
-
-  const fullName = [commentUser.firstName || commentUser.firstname, commentUser.lastName || commentUser.lastname]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
-
-  return fullName || commentUser.username || commentUser.name || commentUser.email || "User";
-};
 
 interface FeedPost {
   id: string;
@@ -94,7 +74,27 @@ interface FeedPost {
   isSaved: boolean;
 }
 
-// --- Helpers ---
+type LayoutProps = {
+  children: ReactNode;
+};
+
+type RecommendedFeedViewProps = {
+  LayoutComponent: ComponentType<LayoutProps>;
+  title: string;
+  subtitle: string;
+};
+
+const getCommentDisplayName = (commentUser: any) => {
+  if (!commentUser) return "User";
+  if (typeof commentUser === "string") return "User";
+
+  const fullName = [commentUser.firstName || commentUser.firstname, commentUser.lastName || commentUser.lastname]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  return fullName || commentUser.username || commentUser.name || commentUser.email || "User";
+};
 
 const getTypeBadge = (type: FeedPost["type"]) => {
   switch (type) {
@@ -122,7 +122,7 @@ const formatTimeAgo = (dateString: string) => {
   return `${days}d ago`;
 };
 
-export default function StartupFeedPage() {
+export function RecommendedFeedView({ LayoutComponent, title, subtitle }: RecommendedFeedViewProps) {
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [loading, setLoading] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -131,21 +131,16 @@ export default function StartupFeedPage() {
   const BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 
   const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
-  
-  // Pagination State
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const observerTarget = useRef(null);
-  
-  // Edit Post State
+  const observerTarget = useRef<HTMLDivElement | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [postToEdit, setPostToEdit] = useState<FeedPost | null>(null);
   const [commentText, setCommentText] = useState("");
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
-  const activePost = posts.find(p => p.id === activeCommentPostId);
+  const activePost = posts.find((post) => post.id === activeCommentPostId);
 
-  // --- 1. Fetch Feed ---
   useEffect(() => {
     const fetchFeed = async () => {
       setLoading(true);
@@ -163,18 +158,18 @@ export default function StartupFeedPage() {
             setHasMore(false);
           } else {
             let uniqueAddedCount = 0;
-            setPosts(prev => {
+            setPosts((prev) => {
               if (page === 1) {
                 const uniquePostsMap = new Map<string, FeedPost>();
-                transformedData.forEach(post => {
+                transformedData.forEach((post) => {
                   if (post.id) uniquePostsMap.set(post.id, post);
                 });
                 uniqueAddedCount = uniquePostsMap.size;
                 return Array.from(uniquePostsMap.values());
               }
 
-              const existingIds = new Set(prev.map((p) => p.id));
-              const uniqueIncoming = transformedData.filter((p) => p.id && !existingIds.has(p.id));
+              const existingIds = new Set(prev.map((post) => post.id));
+              const uniqueIncoming = transformedData.filter((post) => post.id && !existingIds.has(post.id));
               uniqueAddedCount = uniqueIncoming.length;
 
               return uniqueIncoming.length > 0 ? [...prev, ...uniqueIncoming] : prev;
@@ -185,7 +180,6 @@ export default function StartupFeedPage() {
             }
           }
         } else {
-          console.error("Failed to load feed:", res.message);
           setHasMore(false);
         }
       } catch (error) {
@@ -199,32 +193,31 @@ export default function StartupFeedPage() {
     fetchFeed();
   }, [page, user?._id]);
 
-  // Infinite Scroll Observer
   useEffect(() => {
     const observer = new IntersectionObserver(
-      entries => {
+      (entries) => {
         if (entries[0].isIntersecting && hasMore && !loading) {
-          setPage(prev => prev + 1);
+          setPage((prev) => prev + 1);
         }
       },
       { threshold: 1.0 }
     );
 
-    if (observerTarget.current) {
-      observer.observe(observerTarget.current);
+    const currentTarget = observerTarget.current;
+    if (currentTarget) {
+      observer.observe(currentTarget);
     }
 
     return () => {
-      if (observerTarget.current) {
-        observer.unobserve(observerTarget.current);
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
       }
     };
   }, [hasMore, loading]);
 
-  // --- Transform Data ---
   const transformFeedItem = (item: any): FeedPost => {
     const realId = item.contentId || item.postId || item._id;
-    let postType: FeedPost['type'] = "update";
+    let postType: FeedPost["type"] = "update";
     const lowerTitle = (item.title || "").toLowerCase();
     if (lowerTitle.includes("event") || lowerTitle.includes("webinar")) postType = "event";
     else if (lowerTitle.includes("launch") || lowerTitle.includes("product")) postType = "promotion";
@@ -252,14 +245,13 @@ export default function StartupFeedPage() {
   };
 
   const handleAuthError = () => {
-    toast({ 
-      title: "Session Expired", 
-      description: "Please login again to continue.", 
-      variant: "destructive" 
+    toast({
+      title: "Session Expired",
+      description: "Please login again to continue.",
+      variant: "destructive",
     });
   };
 
-  // --- Share Logic ---
   const handleShare = async (post: FeedPost) => {
     const shareData = {
       title: post.title,
@@ -274,12 +266,11 @@ export default function StartupFeedPage() {
         await navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`);
         toast({ title: "Link copied to clipboard!" });
       }
-    } catch (err) {
-      console.error("Error sharing:", err);
+    } catch (error) {
+      console.error("Error sharing:", error);
     }
   };
 
-  // --- 2. Like / Unlike ---
   const toggleLike = async (post: FeedPost) => {
     if (!user?._id) {
       toast({ title: "Login Required", description: "Please login to like posts.", variant: "destructive" });
@@ -289,18 +280,18 @@ export default function StartupFeedPage() {
     const previousState = [...posts];
     const isLiking = !post.isLiked;
 
-    setPosts(posts.map((p) => 
-      p.id === post.id 
-        ? { ...p, isLiked: isLiking, likes: isLiking ? p.likes + 1 : p.likes - 1 } 
-        : p
+    setPosts(posts.map((entry) =>
+      entry.id === post.id
+        ? { ...entry, isLiked: isLiking, likes: isLiking ? entry.likes + 1 : entry.likes - 1 }
+        : entry
     ));
 
     try {
       const endpoint = isLiking ? `/like/${post.id}` : `/unlike/${post.id}`;
-      const res = await apiFetch(endpoint, { 
+      const res = await apiFetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user._id })
+        body: JSON.stringify({ userId: user._id }),
       });
 
       if (res.status === 401) {
@@ -310,10 +301,10 @@ export default function StartupFeedPage() {
       }
 
       if (res.error) throw new Error(res.error);
-      
-      if (typeof res.likes === 'number') {
-        setPosts(currentPosts => currentPosts.map(p => 
-          p.id === post.id ? { ...p, likes: res.likes } : p
+
+      if (typeof res.likes === "number") {
+        setPosts((currentPosts) => currentPosts.map((entry) =>
+          entry.id === post.id ? { ...entry, likes: res.likes } : entry
         ));
       }
     } catch (error) {
@@ -323,42 +314,38 @@ export default function StartupFeedPage() {
     }
   };
 
-  // --- 3. Save / Unsave ---
   const toggleSave = async (post: FeedPost) => {
     if (!user?._id) {
       toast({ title: "Login Required", description: "Please login to save posts.", variant: "destructive" });
       return;
     }
 
-    setPosts(posts.map((p) => p.id === post.id ? { ...p, isSaved: !p.isSaved } : p));
+    setPosts(posts.map((entry) => entry.id === post.id ? { ...entry, isSaved: !entry.isSaved } : entry));
 
     try {
-       const endpoint = `/sav-posts/${post.id}`;
-       const method = post.isSaved ? "DELETE" : "POST";
-       const body = JSON.stringify({ studentId: user._id, postId: post.id });
-       
-       const res = await apiFetch(endpoint, {
-          method,
-          headers: { "Content-Type": "application/json" },
-          body
-       });
+      const endpoint = `/sav-posts/${post.id}`;
+      const method = post.isSaved ? "DELETE" : "POST";
+      const body = JSON.stringify({ studentId: user._id, postId: post.id });
 
-       if (res.status === 401) {
-          handleAuthError();
-          return;
-       }
+      const res = await apiFetch(endpoint, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
 
-       if (res.success === false) throw new Error(res.error);
+      if (res.status === 401) {
+        handleAuthError();
+        return;
+      }
 
+      if (res.success === false) throw new Error(res.error);
     } catch (error) {
-       console.error("Save error", error);
-       setPosts(posts.map((p) => p.id === post.id ? { ...p, isSaved: post.isSaved } : p));
-       toast({ title: "Error", description: "Could not save post", variant: "destructive" });
+      console.error("Save error", error);
+      setPosts(posts.map((entry) => entry.id === post.id ? { ...entry, isSaved: post.isSaved } : entry));
+      toast({ title: "Error", description: "Could not save post", variant: "destructive" });
     }
   };
 
-  // --- 4. Comment Handlers ---
-  
   const openComments = (postId: string) => {
     setActiveCommentPostId(postId);
     setCommentText("");
@@ -373,38 +360,38 @@ export default function StartupFeedPage() {
 
     setIsSubmittingComment(true);
     try {
-        const res = await apiFetch(`/comment/${post.id}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: commentText, userId: user._id })
-        });
+      const res = await apiFetch(`/comment/${post.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: commentText, userId: user._id }),
+      });
 
-        if (res.status === 401) {
-            handleAuthError();
-            return;
-        }
+      if (res.status === 401) {
+        handleAuthError();
+        return;
+      }
 
-        if (res.error) throw new Error(res.error || res.message);
+      if (res.error) throw new Error(res.error || res.message);
 
-        const updatedComments = res.comments || []; 
-        
-        setPosts(posts.map(p => 
-            p.id === post.id 
-            ? { 
-                ...p, 
-                commentsCount: updatedComments.length || p.commentsCount + 1,
-                commentsList: updatedComments
-              } 
-            : p
-        ));
-        
-        toast({ title: "Comment added" });
-        setCommentText("");
+      const updatedComments = res.comments || [];
+
+      setPosts(posts.map((entry) =>
+        entry.id === post.id
+          ? {
+              ...entry,
+              commentsCount: updatedComments.length || entry.commentsCount + 1,
+              commentsList: updatedComments,
+            }
+          : entry
+      ));
+
+      toast({ title: "Comment added" });
+      setCommentText("");
     } catch (error) {
-        console.error("Comment error:", error);
-        toast({ title: "Error", description: "Failed to add comment", variant: "destructive" });
+      console.error("Comment error:", error);
+      toast({ title: "Error", description: "Failed to add comment", variant: "destructive" });
     } finally {
-        setIsSubmittingComment(false);
+      setIsSubmittingComment(false);
     }
   };
 
@@ -415,7 +402,7 @@ export default function StartupFeedPage() {
       const res = await apiFetch(`/comment/${post.id}/${commentId}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user._id })
+        body: JSON.stringify({ userId: user._id }),
       });
 
       if (res.status === 401) {
@@ -425,14 +412,14 @@ export default function StartupFeedPage() {
 
       if (res.error) throw new Error(res.error);
 
-      setPosts(posts.map(p => 
-        p.id === post.id 
-        ? {
-            ...p,
-            commentsList: p.commentsList?.filter(c => c._id !== commentId),
-            commentsCount: Math.max(0, p.commentsCount - 1)
-          }
-        : p
+      setPosts(posts.map((entry) =>
+        entry.id === post.id
+          ? {
+              ...entry,
+              commentsList: entry.commentsList?.filter((comment) => comment._id !== commentId),
+              commentsCount: Math.max(0, entry.commentsCount - 1),
+            }
+          : entry
       ));
       toast({ title: "Comment deleted" });
     } catch (error) {
@@ -440,7 +427,7 @@ export default function StartupFeedPage() {
       toast({ title: "Error", description: "Could not delete comment", variant: "destructive" });
     }
   };
-  
+
   const handleEdit = (post: FeedPost) => {
     setPostToEdit(post);
     setIsEditModalOpen(true);
@@ -449,20 +436,20 @@ export default function StartupFeedPage() {
   const handleDelete = async (post: FeedPost) => {
     if (!user?._id) return;
     try {
-      const res = await apiFetch("/posts/delete-post/" + post.id, { method: "DELETE" });
+      const res = await apiFetch(`/posts/delete-post/${post.id}`, { method: "DELETE" });
       if (res.status === 401) {
         handleAuthError();
         return;
       }
       if (res.success) {
-        setPosts(posts.filter(p => p.id !== post.id));
+        setPosts(posts.filter((entry) => entry.id !== post.id));
         toast({ title: "Post deleted" });
       } else {
         throw new Error(res.error || "Failed to delete");
       }
-    } catch (err) {
-       console.error(err);
-       toast({ title: "Error", description: "Could not delete post", variant: "destructive" });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Could not delete post", variant: "destructive" });
     }
   };
 
@@ -476,30 +463,26 @@ export default function StartupFeedPage() {
   });
 
   return (
-    <StudentLayout>
+    <LayoutComponent>
       <div className="p-6 lg:p-8 animate-fade-in">
         <div className="max-w-3xl mx-auto">
-          {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-foreground">Startup Feed</h1>
-            <p className="text-muted-foreground mt-1">
-              Stay updated with the latest from startups you follow
-            </p>
+            <h1 className="text-3xl font-bold text-foreground">{title}</h1>
+            <p className="text-muted-foreground mt-1">{subtitle}</p>
           </div>
 
-          {/* Search Box Section */}
           <div className="relative mb-8">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search posts by title, company or content..."
               className="pl-10 h-12 bg-secondary/50 border-none focus-visible:ring-1 focus-visible:ring-primary/20"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(event) => setSearchQuery(event.target.value)}
             />
             {searchQuery && (
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <Button
+                variant="ghost"
+                size="icon"
                 className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 hover:bg-transparent"
                 onClick={() => setSearchQuery("")}
               >
@@ -510,8 +493,8 @@ export default function StartupFeedPage() {
 
           <div className="space-y-6">
             {isInitialLoading ? (
-              Array.from({ length: 3 }).map((_, i) => (
-                <Card key={i} className="animate-pulse">
+              Array.from({ length: 3 }).map((_, index) => (
+                <Card key={index} className="animate-pulse">
                   <CardContent className="h-48" />
                 </Card>
               ))
@@ -586,21 +569,19 @@ export default function StartupFeedPage() {
                           src={resolveMediaUrl(BASE_URL, post.image)}
                           alt={post.title}
                           className="w-full h-auto max-h-[400px] object-cover"
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                          onError={(event) => {
+                            (event.target as HTMLImageElement).style.display = "none";
+                          }}
                         />
                       </div>
                     )}
-                    
+
                     {post.video && (
-                       <div className="rounded-lg overflow-hidden border bg-black aspect-video relative">
-                          <video 
-                             controls
-                             className="w-full h-full"
-                            src={resolveMediaUrl(BASE_URL, post.video)}
-                          >
-                             Your browser does not support the video tag.
-                          </video>
-                       </div>
+                      <div className="rounded-lg overflow-hidden border bg-black aspect-video relative">
+                        <video controls className="w-full h-full" src={resolveMediaUrl(BASE_URL, post.video)}>
+                          Your browser does not support the video tag.
+                        </video>
+                      </div>
                     )}
 
                     {post.link && (
@@ -627,28 +608,18 @@ export default function StartupFeedPage() {
                           <Heart className={`h-4 w-4 mr-1 ${post.isLiked ? "fill-current" : ""}`} />
                           {post.likes}
                         </Button>
-                        
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="hover:bg-accent/10"
-                          onClick={() => openComments(post.id)}
-                        >
+
+                        <Button variant="ghost" size="sm" className="hover:bg-accent/10" onClick={() => openComments(post.id)}>
                           <MessageCircle className="h-4 w-4 mr-1" />
                           {post.commentsCount}
                         </Button>
-                        
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="hover:bg-accent/10"
-                          onClick={() => handleShare(post)}
-                        >
+
+                        <Button variant="ghost" size="sm" className="hover:bg-accent/10" onClick={() => handleShare(post)}>
                           <Share2 className="h-4 w-4 mr-1" />
                           Share
                         </Button>
                       </div>
-                      
+
                       <Button
                         variant="ghost"
                         size="sm"
@@ -662,7 +633,6 @@ export default function StartupFeedPage() {
                 </Card>
               ))
             ) : (
-              !isInitialLoading && (
               <Card className="p-12 text-center border-dashed">
                 <div className="flex flex-col items-center justify-center gap-3">
                   <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
@@ -677,32 +647,26 @@ export default function StartupFeedPage() {
                   )}
                 </div>
               </Card>
-              )
             )}
-            
+
             {loading && hasMore && (
-               <div className="flex justify-center p-8 w-full">
-                  <Loader2 className="animate-spin h-6 w-6 text-primary" />
-               </div>
+              <div className="flex justify-center p-8 w-full">
+                <Loader2 className="animate-spin h-6 w-6 text-primary" />
+              </div>
             )}
-            
+
             {!loading && hasMore && posts.length > 0 && (
-               <div ref={observerTarget} className="h-10 w-full flex justify-center p-4">
-               </div>
+              <div ref={observerTarget} className="h-10 w-full flex justify-center p-4" />
             )}
           </div>
         </div>
 
-        {/* COMMENTS MODAL */}
-        <Dialog 
-          open={!!activeCommentPostId} 
-          onOpenChange={(open) => !open && setActiveCommentPostId(null)}
-        >
+        <Dialog open={!!activeCommentPostId} onOpenChange={(open) => !open && setActiveCommentPostId(null)}>
           <DialogContent className="sm:max-w-lg h-[80vh] flex flex-col p-0 gap-0">
             <DialogHeader className="p-6 pb-2">
               <DialogTitle>Comments ({activePost?.commentsCount || 0})</DialogTitle>
             </DialogHeader>
-            
+
             <ScrollArea className="flex-1 p-6 pt-2">
               {activePost?.commentsList && activePost.commentsList.length > 0 ? (
                 <div className="space-y-4">
@@ -713,17 +677,12 @@ export default function StartupFeedPage() {
                       </Avatar>
                       <div className="flex-1 bg-secondary/50 p-3 rounded-lg">
                         <div className="flex items-center justify-between mb-1">
-                          <span className="font-semibold text-xs opacity-70">
-                            {getCommentDisplayName(comment.user)}
-                          </span>
-                          
-                          {user && (typeof comment.user === 'string' 
-                              ? comment.user === user._id 
-                              : comment.user?._id === user._id
-                          ) && (
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
+                          <span className="font-semibold text-xs opacity-70">{getCommentDisplayName(comment.user)}</span>
+
+                          {user && ((typeof comment.user === "string" && comment.user === user._id) || comment.user?._id === user._id) && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive/10"
                               onClick={() => activePost && deleteComment(activePost, comment._id)}
                             >
@@ -746,15 +705,15 @@ export default function StartupFeedPage() {
 
             <div className="p-4 border-t bg-background mt-auto">
               <div className="flex gap-2">
-                <UiTextarea 
-                  placeholder="Write a comment..." 
+                <UiTextarea
+                  placeholder="Write a comment..."
                   className="min-h-[40px] max-h-[100px] resize-none"
                   value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
+                  onChange={(event) => setCommentText(event.target.value)}
                 />
-                <Button 
-                  size="icon" 
-                  onClick={() => activePost && submitComment(activePost)} 
+                <Button
+                  size="icon"
+                  onClick={() => activePost && submitComment(activePost)}
                   disabled={isSubmittingComment || !commentText.trim()}
                   className="mt-auto shrink-0"
                 >
@@ -765,28 +724,25 @@ export default function StartupFeedPage() {
           </DialogContent>
         </Dialog>
 
-      <CreatePostModal 
-        open={isEditModalOpen} 
-        onOpenChange={(open) => {
-          setIsEditModalOpen(open);
-          if (!open) setPostToEdit(null);
-        }}
-        onSuccess={() => {
-          // Refresh posts locally without reloading
-          setPage(1);
-          setPosts([]);
-          setHasMore(true);
-          setLoading(true);
-          // The useEffect will trigger automatically since page is reset or we can manually refetch if needed
-          // But resetting page to 1 will trigger the main useEffect
-        }}
-        initialData={postToEdit ? {
-          id: postToEdit.id,
-          title: postToEdit.title,
-          description: postToEdit.content
-        } : undefined}
-      />
+        <CreatePostModal
+          open={isEditModalOpen}
+          onOpenChange={(open) => {
+            setIsEditModalOpen(open);
+            if (!open) setPostToEdit(null);
+          }}
+          onSuccess={() => {
+            setPage(1);
+            setPosts([]);
+            setHasMore(true);
+            setLoading(true);
+          }}
+          initialData={postToEdit ? {
+            id: postToEdit.id,
+            title: postToEdit.title,
+            description: postToEdit.content,
+          } : undefined}
+        />
       </div>
-    </StudentLayout>
+    </LayoutComponent>
   );
 }

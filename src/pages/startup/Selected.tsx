@@ -12,6 +12,8 @@ import { jobService } from "@/services/jobService";
 import { applicationService } from "@/services/applicationService";
 import { selectionService } from "@/services/selectionService";
 import { Checkbox } from "@/components/ui/checkbox";
+import { API_BASE_URL } from "@/lib/api";
+import { resolveMediaUrl } from "@/lib/media";
 
 /* ---------------- TYPES ---------------- */
 
@@ -32,6 +34,7 @@ interface Applicant {
 /* ---------------- COMPONENT ---------------- */
 
 export default function Selected() {
+  const BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
   const [selectedApps, setSelectedApps] = useState<Applicant[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -189,7 +192,7 @@ export default function Selected() {
                   <div className="pt-2">
                     <Button variant="outline" size="sm" className="w-full text-xs" asChild>
                       <a 
-                        href={c.resumeUrl.startsWith('http') ? c.resumeUrl : `http://localhost:3000${c.resumeUrl}`} 
+                        href={resolveMediaUrl(BASE_URL, c.resumeUrl)}
                         target="_blank" 
                         rel="noopener noreferrer"
                       >

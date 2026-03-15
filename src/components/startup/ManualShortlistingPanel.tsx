@@ -28,6 +28,8 @@ import {
   Hand,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { API_BASE_URL } from "@/lib/api";
+import { resolveMediaUrl } from "@/lib/media";
 
 interface ManualShortlistingPanelProps {
   applicants: Applicant[];
@@ -40,6 +42,7 @@ export function ManualShortlistingPanel({
   onStatusChange,
   onSendEmail,
 }: ManualShortlistingPanelProps) {
+  const BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
   const [selectedApplicant, setSelectedApplicant] = useState<Applicant | null>(null);
   const [reviewNotes, setReviewNotes] = useState("");
   const [statusModalOpen, setStatusModalOpen] = useState(false);
@@ -154,7 +157,7 @@ export function ManualShortlistingPanel({
                 {selectedApplicant.resumeUrl && (
                   <Button variant="outline" size="sm" asChild>
                     <a
-                      href={selectedApplicant.resumeUrl.startsWith('http') ? selectedApplicant.resumeUrl : `http://localhost:3000${selectedApplicant.resumeUrl}`}
+                      href={resolveMediaUrl(BASE_URL, selectedApplicant.resumeUrl)}
                       target="_blank"
                       rel="noopener noreferrer"
                     >

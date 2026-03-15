@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, getStoredUser } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 import { Users, Building, DollarSign, CheckCircle, Plus, BarChart3, Loader2, XCircle, Eye } from "lucide-react";
 import { CreatePostModal } from "@/components/startup/CreatePostModal";
@@ -27,9 +27,12 @@ type InvitationCodeRecord = {
 };
 
 export default function IncubatorDashboard() {
+  const user = getStoredUser();
   const [stats, setStats] = useState<any>(null);
   const [startups, setStartups] = useState<any[]>([]);
   const [updates, setUpdates] = useState<any[]>([]);
+  const [recommendedPosts, setRecommendedPosts] = useState<any[]>([]);
+  const [trendingJobs, setTrendingJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
   const [processingStartupId, setProcessingStartupId] = useState<string | null>(null);
@@ -79,12 +82,20 @@ export default function IncubatorDashboard() {
     setLoading(true);
     setPayoutLoading(true);
     try {
-      const [statsRes, startupsRes, feedRes, payoutRes, invitationCodesRes] = await Promise.all([
+      const recommendationUserId = user?._id;
+
+      const [statsRes, startupsRes, feedRes, payoutRes, invitationCodesRes, recommendedPostsRes, trendingJobsRes] = await Promise.all([
         apiFetch("/incubator/dashboard"),
         apiFetch("/incubator/startups"),
         apiFetch("/incubator/feed"),
         apiFetch("/incubator/payout-details"),
         apiFetch("/incubator/invitation-codes"),
+        apiFetch(
+          recommendationUserId
+            ? `/recommendations/posts/${recommendationUserId}?limit=3&page=1`
+            : "/recommendations/cold-start/posts?limit=3&page=1"
+        ),
+        apiFetch(`/recommendations/trending/jobs?limit=3&page=1${recommendationUserId ? `&userId=${recommendationUserId}` : ""}`),
       ]);
 
       if (statsRes.success) setStats(statsRes.data);
@@ -108,6 +119,12 @@ export default function IncubatorDashboard() {
       }
       if (invitationCodesRes.success && invitationCodesRes.data) {
         setInvitationCodes(invitationCodesRes.data);
+      }
+      if (recommendedPostsRes.success && Array.isArray(recommendedPostsRes.data)) {
+        setRecommendedPosts(recommendedPostsRes.data.slice(0, 3));
+      }
+      if (trendingJobsRes.success && Array.isArray(trendingJobsRes.data)) {
+        setTrendingJobs(trendingJobsRes.data.slice(0, 3));
       }
     } catch (error) {
       console.error("Failed to fetch incubator data", error);
@@ -284,6 +301,12 @@ export default function IncubatorDashboard() {
             <p className="text-muted-foreground mt-1">Platform overview and startup performance</p>
           </div>
           <div className="flex gap-2">
+            <Link to="/incubator/profile">
+              <Button variant="outline" className="gap-2">
+                <Building className="h-4 w-4" />
+                Edit Profile
+              </Button>
+            </Link>
             <Link to="/incubator/social-analysis">
               <Button variant="outline" className="gap-2">
                 <BarChart3 className="h-4 w-4" />
@@ -343,6 +366,56 @@ export default function IncubatorDashboard() {
             </Card>
         </div>
 
+        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2 mt-2">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle>Recommended Feed</CardTitle>
+              <Link to="/incubator/feed">
+                <Button variant="ghost" size="sm">View Feed</Button>
+              </Link>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {recommendedPosts.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No recommended posts right now.</p>
+              ) : (
+                recommendedPosts.map((post) => (
+                  <div key={post._id} className="rounded-lg border p-3">
+                    <p className="font-medium line-clamp-1">{post.title || "Startup Update"}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                      {post.description || "Fresh update from startup ecosystem."}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">{post.startupid?.startupName || "Startup"}</p>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle>Trending Jobs</CardTitle>
+              <Link to="/incubator/trending">
+                <Button variant="ghost" size="sm">View Trending</Button>
+              </Link>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {trendingJobs.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No trending jobs available right now.</p>
+              ) : (
+                trendingJobs.map((job) => (
+                  <div key={job._id} className="rounded-lg border p-3">
+                    <p className="font-medium line-clamp-1">{job.role}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {job.startup?.startupName || "Startup"} • {job.location || "Remote"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">{job.jobType || "Role"}</p>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3 mt-8">
           {/* Startups Table - Read Only */}
           <div className="lg:col-span-2 border rounded-lg bg-card bg-white overflow-hidden h-fit">
@@ -356,15 +429,16 @@ export default function IncubatorDashboard() {
                     <TableHead>Startup Name</TableHead>
                     <TableHead>Industry</TableHead>
                     <TableHead>Stage</TableHead>
+                    <TableHead>Hiring</TableHead>
                     <TableHead>Status</TableHead>
                   <TableHead className="text-right">Affiliation Action</TableHead>
                 </TableRow>
                 </TableHeader>
                 <TableBody>
                 {loading ? (
-                  <TableRow><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
                 ) : startups.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground">No startups found.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center py-6 text-muted-foreground">No startups found.</TableCell></TableRow>
                 ) : (
                     startups.map((startup) => (
                     <TableRow key={startup._id}>
@@ -375,6 +449,13 @@ export default function IncubatorDashboard() {
                         </TableCell>
                         <TableCell>{startup.industry}</TableCell>
                         <TableCell>{startup.stage}</TableCell>
+                        <TableCell>
+                          {(startup.activeHiring ?? startup.hiring) ? (
+                            <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Active</Badge>
+                          ) : (
+                            <Badge variant="secondary">Inactive</Badge>
+                          )}
+                        </TableCell>
                         <TableCell>
                         {startup.incubator_verified ? (
                             <Badge className="bg-green-100 text-green-700 hover:bg-green-100 flex gap-1 w-fit"><CheckCircle className="w-3 h-3"/> Verified</Badge>
@@ -636,6 +717,7 @@ export default function IncubatorDashboard() {
             </div>
           </div>
         </div>
+
       </div>
       <CreatePostModal open={isCreatePostOpen} onOpenChange={setIsCreatePostOpen} />
     </AdminLayout>

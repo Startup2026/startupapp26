@@ -5,11 +5,15 @@ import {
   Building2,
   Users,
   Shield,
+  User,
   BarChart3,
   Bell,
   LogOut,
   ChevronRight,
   Menu,
+  TrendingUp,
+  Rss,
+  Bookmark,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -53,6 +57,10 @@ const adminNavItems = [
 
 const incubatorNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/incubator/dashboard" },
+  { icon: TrendingUp, label: "Trending", href: "/incubator/trending" },
+  { icon: Rss, label: "Feed", href: "/incubator/feed" },
+  { icon: Bookmark, label: "Saved", href: "/incubator/saved" },
+  { icon: User, label: "Profile", href: "/incubator/profile" },
   { icon: BarChart3, label: "Social Analysis", href: "/incubator/social-analysis" },
   { icon: Bell, label: "Notifications", href: "/incubator/notifications" },
 ];

@@ -68,6 +68,7 @@ type StartupPlanCard = {
   name: string;
   title: string;
   durationLabel: string;
+  originalPriceINR: number;
   totalPriceINR: number;
   effectiveMonthlyINR?: number;
   description: string;
@@ -100,9 +101,10 @@ const STARTUP_PLANS: StartupPlanCard[] = [
     name: "SPRINT_3MO",
     title: "Sprint · 3 Months",
     durationLabel: "3-Month Hiring Cycle",
+    originalPriceINR: 1999,
     totalPriceINR: 999,
     effectiveMonthlyINR: 333,
-    description: "All platform features for a focused 3-month sprint.",
+    description: "All platform features for a focused 3-month sprint with a launching discount.",
     Icon: Rocket,
     iconBg: "bg-blue-500/10",
     iconColor: "text-blue-500",
@@ -112,9 +114,10 @@ const STARTUP_PLANS: StartupPlanCard[] = [
     name: "BUILDER_6MO",
     title: "Builder · 6 Months",
     durationLabel: "Most Popular",
+    originalPriceINR: 2999,
     totalPriceINR: 1999,
     effectiveMonthlyINR: 333,
-    description: "Same full feature access with a longer 6-month cycle.",
+    description: "Same full feature access with a longer 6-month cycle and a launching discount.",
     Icon: Zap,
     iconBg: "bg-amber-500/10",
     iconColor: "text-amber-600",
@@ -125,9 +128,10 @@ const STARTUP_PLANS: StartupPlanCard[] = [
     name: "PARTNER_12MO",
     title: "Partner · 12 Months",
     durationLabel: "12-Month Hiring Cycle",
-    totalPriceINR: 2999,
-    effectiveMonthlyINR: 250,
-    description: "Full feature access with the best value annual cycle.",
+    originalPriceINR: 4999,
+    totalPriceINR: 3999,
+    effectiveMonthlyINR: 333,
+    description: "Full feature access with the best value annual cycle and a launching discount.",
     Icon: ShieldCheck,
     iconBg: "bg-purple-500/10",
     iconColor: "text-purple-600",
@@ -562,10 +566,12 @@ const Index = () => {
                       {plan.description}
                     </CardDescription>
                     <div className="mt-6 space-y-1">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-green-600">Launching Discount</p>
+                      <span className="block text-sm text-muted-foreground line-through">{formatINR(plan.originalPriceINR)}</span>
                       <span className="text-4xl font-bold tracking-tight">{formatINR(plan.totalPriceINR)}</span>
                       <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{plan.durationLabel}</span>
                       {plan.effectiveMonthlyINR && (
-                        <p className="text-xs text-muted-foreground">Effective {formatINR(plan.effectiveMonthlyINR)}/month</p>
+                        <p className="text-xs text-muted-foreground">Effective {formatINR(plan.effectiveMonthlyINR)}/month after discount</p>
                       )}
                     </div>
                   </CardHeader>

@@ -37,6 +37,8 @@ import {
   Bot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { API_BASE_URL } from "@/lib/api";
+import { resolveMediaUrl } from "@/lib/media";
 
 export interface Applicant {
   id: string;
@@ -74,6 +76,7 @@ export function ApplicantsTable({
   onViewDetails,
   onSendEmail,
 }: ApplicantsTableProps) {
+  const BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [sortField, setSortField] = useState<SortField>("appliedAt");
@@ -244,7 +247,7 @@ export function ApplicantsTable({
                     {applicant.resumeUrl ? (
                       <Button variant="ghost" size="sm" asChild className="h-8 gap-1">
                         <a 
-                          href={applicant.resumeUrl.startsWith('http') ? applicant.resumeUrl : `http://localhost:3000${applicant.resumeUrl}`} 
+                          href={resolveMediaUrl(BASE_URL, applicant.resumeUrl)}
                           target="_blank" 
                           rel="noopener noreferrer"
                         >

@@ -14,6 +14,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { applicationService } from "@/services/applicationService";
 import { interviewService } from "@/services/interviewService";
 import { format } from "date-fns";
+import { API_BASE_URL } from "@/lib/api";
+import { resolveMediaUrl } from "@/lib/media";
 import {
   Dialog,
   DialogContent,
@@ -47,6 +49,7 @@ interface Applicant {
 /* ---------------- COMPONENT ---------------- */
 
 export default function Shortlisted() {
+  const BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
   const [shortlistedApps, setShortlistedApps] = useState<Applicant[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -107,7 +110,8 @@ export default function Shortlisted() {
             // Map to UI model
             const cleanApps: Applicant[] = relevantApps.map(app => {
                 const student = app.studentId as any; 
-                const job = typeof app.jobId === 'object' ? app.jobId : myJobs.find(j => j._id === app.jobId);
+              const appJobId = typeof app.jobId === 'object' ? (app.jobId as any)?._id : app.jobId;
+              const job = typeof app.jobId === 'object' ? app.jobId : myJobs.find(j => (j as any)._id === appJobId);
 
                 return {
                     id: app._id,
@@ -329,7 +333,7 @@ export default function Shortlisted() {
                     {c.resumeUrl && (
                       <Button variant="outline" size="sm" className="flex-1 text-xs border-teal-500 text-teal-600 hover:bg-teal-50" asChild>
                          <a 
-                          href={c.resumeUrl.startsWith('http') ? c.resumeUrl : `http://localhost:3000${c.resumeUrl}`} 
+                          href={resolveMediaUrl(BASE_URL, c.resumeUrl)}
                           target="_blank" 
                           rel="noopener noreferrer"
                         >

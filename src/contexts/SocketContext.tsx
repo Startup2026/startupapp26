@@ -3,6 +3,7 @@ import { Socket } from 'socket.io-client';
 import { getSocket } from '@/lib/socket';
 import { getAuthToken, getStoredUser } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface SocketContextType {
   socket: Socket | null;
@@ -14,16 +15,20 @@ export const useSocket = () => useContext(SocketContext);
 
 export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [socket, setSocket] = useState<Socket | null>(null);
+  const { user } = useAuth();
 
   useEffect(() => {
     const token = getAuthToken();
-    if (!token) return;
+    const activeUser = user || getStoredUser();
+    const userId = activeUser?.id || activeUser?._id;
+
+    if (!token || !userId) {
+      setSocket(null);
+      return;
+    }
 
     const socketInstance = getSocket(token);
     setSocket(socketInstance);
-
-    const user = getStoredUser();
-    const userId = user?.id || user?._id;
 
     const joinRoom = () => {
       if (userId) {
@@ -71,7 +76,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       socketInstance.disconnect();
       setSocket(null);
     };
-  }, []);
+  }, [user?.id, user?._id]);
 
   return (
     <SocketContext.Provider value={{ socket }}>

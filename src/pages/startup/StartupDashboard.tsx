@@ -30,11 +30,31 @@ import { applicationService, Application } from "@/services/applicationService";
 import { interviewService } from "@/services/interviewService";
 import { feedService, Post as FeedPost } from "@/services/feedService";
 import { useAuth } from "@/contexts/AuthContext";
-import { API_BASE_URL } from "@/lib/api";
+import { API_BASE_URL, apiFetch } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { usePlanAccess } from "@/hooks/usePlanAccess";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { formatDistanceToNow } from "date-fns";
+import { resolveMediaUrl } from "@/lib/media";
+
+interface DashboardRecommendationPost {
+  _id: string;
+  title?: string;
+  description?: string;
+  startupid?: {
+    startupName?: string;
+  };
+}
+
+interface DashboardTrendingJob {
+  _id: string;
+  role: string;
+  startup?: {
+    startupName?: string;
+  };
+  location?: string;
+  jobType?: string;
+}
 
 export default function StartupDashboard() {
   const { 
@@ -51,6 +71,8 @@ export default function StartupDashboard() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [interviews, setInterviews] = useState<any[]>([]);
   const [myPosts, setMyPosts] = useState<FeedPost[]>([]);
+  const [recommendedPosts, setRecommendedPosts] = useState<DashboardRecommendationPost[]>([]);
+  const [trendingJobs, setTrendingJobs] = useState<DashboardTrendingJob[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -61,18 +83,27 @@ export default function StartupDashboard() {
     const fetchData = async () => {
       if (planLoading) return;
       try {
+        const recommendationUserId = user?._id || user?.id;
         const [
           profileResult,
           jobsResult,
           applicationsResult,
           interviewsResult,
           myPostsResult,
+          recommendedPostsResult,
+          trendingJobsResult,
         ] = await Promise.all([
           startupProfileService.getMyProfile(),
           jobService.getAllJobs(),
           applicationService.getAllApplications(),
           interviewService.getAllInterviews(),
           feedService.getMyPosts("latest"),
+          apiFetch(
+            recommendationUserId
+              ? `/recommendations/posts/${recommendationUserId}?limit=3&page=1`
+              : "/recommendations/cold-start/posts?limit=3&page=1"
+          ),
+          apiFetch(`/recommendations/trending/jobs?limit=3&page=1${recommendationUserId ? `&userId=${recommendationUserId}` : ""}`),
         ]);
 
         let currentProfile: StartupProfile | null = null;
@@ -109,6 +140,18 @@ export default function StartupDashboard() {
         } else {
           setMyPosts([]);
           console.error("Failed to fetch posts:", myPostsResult.error);
+        }
+
+        if (recommendedPostsResult.success && Array.isArray(recommendedPostsResult.data)) {
+          setRecommendedPosts(recommendedPostsResult.data.slice(0, 3));
+        } else {
+          setRecommendedPosts([]);
+        }
+
+        if (trendingJobsResult.success && Array.isArray(trendingJobsResult.data)) {
+          setTrendingJobs(trendingJobsResult.data.slice(0, 3));
+        } else {
+          setTrendingJobs([]);
         }
 
         // Profile already exists at this point; layout handles onboarding redirects when needed.
@@ -230,7 +273,7 @@ export default function StartupDashboard() {
               onClick={() => setProfileModalOpen(true)}
             >
              {profile?.profilepic ? (
-                <img src={`${BASE_URL}${profile.profilepic}`} alt={profile.startupName} className="h-full w-full object-cover rounded-2xl" />
+                <img src={resolveMediaUrl(BASE_URL, profile.profilepic)} alt={profile.startupName} className="h-full w-full object-cover rounded-2xl" />
               ) : (
                 profile ? getInitials(profile.startupName) : "..."
               )}
@@ -366,7 +409,7 @@ export default function StartupDashboard() {
                             const rawUrl = app.resumeUrl || student?.resumeUrl;
                             
                             if (rawUrl) {
-                                const fullUrl = rawUrl.startsWith('http') ? rawUrl : `http://localhost:3000${rawUrl}`;
+                              const fullUrl = resolveMediaUrl(BASE_URL, rawUrl);
                                 window.open(fullUrl, '_blank'); 
                             } else {
                                 toast({
@@ -428,6 +471,68 @@ export default function StartupDashboard() {
               </CardContent>
             </Card>
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-accent" />
+                Recommended Feed
+              </CardTitle>
+              <Link to="/startup/feed">
+                <Button variant="ghost" size="sm" className="gap-1">
+                  View feed <ArrowUpRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {recommendedPosts.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No recommended posts right now.</p>
+              ) : (
+                recommendedPosts.map((post) => (
+                  <div key={post._id} className="rounded-lg border border-border p-3">
+                    <p className="font-medium line-clamp-1">{post.title || "Startup Update"}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                      {post.description || "New update from the startup community."}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {post.startupid?.startupName || "Startup"}
+                    </p>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="flex items-center gap-2">
+                <Briefcase className="h-5 w-5 text-accent" />
+                Trending Jobs
+              </CardTitle>
+              <Link to="/startup/trending">
+                <Button variant="ghost" size="sm" className="gap-1">
+                  View trending <ArrowUpRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {trendingJobs.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No trending jobs available right now.</p>
+              ) : (
+                trendingJobs.map((job) => (
+                  <div key={job._id} className="rounded-lg border border-border p-3">
+                    <p className="font-medium line-clamp-1">{job.role}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {job.startup?.startupName || "Startup"} • {job.location || "Remote"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">{job.jobType || "Role"}</p>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Upcoming Interviews & Pipeline Stats */}
@@ -517,6 +622,7 @@ export default function StartupDashboard() {
             </CardContent>
           </Card>
         </div>
+
           </TabsContent>
 
           <TabsContent value="posts" className="space-y-8">

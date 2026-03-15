@@ -14,6 +14,7 @@ import {
   XCircle,
   Settings,
   LogOut,
+  Flag,
 } from "lucide-react";
 import { StudentLayout } from "@/components/layouts/StudentLayout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,6 +27,11 @@ import { calculateProfileCompletion } from "@/lib/utils";
 import { useSocket } from "@/contexts/SocketContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { resolveMediaUrl } from "@/lib/media";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface StartupUpdate {
   _id: string;
@@ -49,12 +55,28 @@ interface TrendingJob {
   };
 }
 
+interface JobReport {
+  _id: string;
+  reason: string;
+  status: "open" | "kept" | "removed";
+  createdAt: string;
+  jobId?: {
+    _id?: string;
+    role?: string;
+    startupId?: {
+      startupName?: string;
+    };
+  };
+}
+
 export default function StudentDashboard() {
   const [startups, setStartups] = useState<any[]>([]);
   const [updates, setUpdates] = useState<StartupUpdate[]>([]);
   const [trendingJobs, setTrendingJobs] = useState<TrendingJob[]>([]);
+  const [myReportedJobs, setMyReportedJobs] = useState<JobReport[]>([]);
   const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submittingReport, setSubmittingReport] = useState(false);
   const [completion, setCompletion] = useState(0);
   const [profile, setProfile] = useState<any>(null);
   const [stats, setStats] = useState({
@@ -63,6 +85,10 @@ export default function StudentDashboard() {
     pending: 0,
     rejected: 0
   });
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [selectedJobForReport, setSelectedJobForReport] = useState<TrendingJob | null>(null);
+  const [reportReason, setReportReason] = useState("Spam");
+  const [reportDetails, setReportDetails] = useState("");
   const user = getStoredUser();
   const navigate = useNavigate();
   const { socket } = useSocket();
@@ -132,11 +158,12 @@ export default function StudentDashboard() {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const [startupRes, trendingRes, profileRes, applicationsRes] = await Promise.all([
+      const [startupRes, trendingRes, profileRes, applicationsRes, reportsRes] = await Promise.all([
         apiFetch("/startupProfiles"),
-        apiFetch(user?._id ? `/recommendations/trending/jobs` : `/recommendations/cold-start?type=trending-jobs&limit=3`),
+        apiFetch(user?._id ? `/recommendations/trending/jobs?userId=${user._id}&limit=3&page=1` : `/recommendations/cold-start?type=trending-jobs&limit=3`),
         studentProfileService.getMyProfile(),
-        user?._id ? apiFetch(`/applications/student/${user._id}`) : Promise.resolve({ success: false })
+        user?._id ? apiFetch(`/applications/student/${user._id}`) : Promise.resolve({ success: false }),
+        apiFetch("/reports/jobs/me")
       ]);
       
       if (profileRes.success && profileRes.data) {
@@ -179,6 +206,10 @@ export default function StudentDashboard() {
         setTrendingJobs(trendingRes.data.slice(0, 3));
       }
 
+      if (reportsRes.success && Array.isArray(reportsRes.data)) {
+        setMyReportedJobs(reportsRes.data.slice(0, 5));
+      }
+
     } catch (error) {
       console.error("Dashboard fetch error:", error);
     } finally {
@@ -189,6 +220,57 @@ export default function StudentDashboard() {
   useEffect(() => {
     fetchDashboardData();
   }, [user?._id]);
+
+  const openReportDialog = (job: TrendingJob, event: any) => {
+    event.stopPropagation();
+    setSelectedJobForReport(job);
+    setReportReason("Spam");
+    setReportDetails("");
+    setReportDialogOpen(true);
+  };
+
+  const handleReportSubmit = async () => {
+    if (!selectedJobForReport?._id) return;
+
+    setSubmittingReport(true);
+    try {
+      const response = await apiFetch(`/reports/jobs/${selectedJobForReport._id}`, {
+        method: "POST",
+        body: JSON.stringify({ reason: reportReason, details: reportDetails.trim() }),
+      });
+
+      if (!response.success) {
+        toast({
+          title: "Unable to submit report",
+          description: response.error || "Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Report submitted",
+        description: "The moderation team will review this job.",
+      });
+      setReportDialogOpen(false);
+      fetchDashboardData();
+    } catch (error) {
+      console.error("Failed to report job:", error);
+      toast({
+        title: "Unable to submit report",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmittingReport(false);
+    }
+  };
+
+  const reportStatusVariant = (status: JobReport["status"]) => {
+    if (status === "removed") return "success" as const;
+    if (status === "kept") return "secondary" as const;
+    return "warning" as const;
+  };
 
   const formatTimeAgo = (dateString: string) => {
     const seconds = Math.floor((new Date().getTime() - new Date(dateString).getTime()) / 1000);
@@ -314,7 +396,7 @@ export default function StudentDashboard() {
                     <CardContent className="p-4 flex items-center gap-4">
                       <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center font-bold text-accent shrink-0">
                         {app.jobId?.startupId?.profilepic ? (
-                          <img src={`${BASE_URL}${app.jobId.startupId.profilepic}`} className="rounded-lg w-full h-full object-cover" />
+                          <img src={resolveMediaUrl(BASE_URL, app.jobId.startupId.profilepic)} className="rounded-lg w-full h-full object-cover" />
                         ) : (
                           <Building2 className="h-5 w-5" />
                         )}
@@ -368,7 +450,7 @@ export default function StudentDashboard() {
                   <CardContent className="p-5">
                     <div className="flex items-center gap-3 mb-3">
                       <div className="h-12 w-12 rounded-xl bg-accent/10 flex items-center justify-center font-bold text-accent uppercase">
-                        {startup.profilepic ? <img src={`${BASE_URL}${startup.profilepic}`} className="rounded-xl w-full h-full object-cover" /> : startup.startupName.substring(0,2)}
+                        {startup.profilepic ? <img src={resolveMediaUrl(BASE_URL, startup.profilepic)} className="rounded-xl w-full h-full object-cover" /> : startup.startupName.substring(0,2)}
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold truncate">{startup.startupName}</h3>
@@ -446,6 +528,30 @@ export default function StudentDashboard() {
                 </CardContent>
               </Card>
             </div>
+
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold">Reported Jobs</h2>
+              <Card>
+                <CardContent className="p-4 space-y-3">
+                  {loading ? (
+                    <div className="flex justify-center"><Loader2 className="animate-spin" /></div>
+                  ) : myReportedJobs.length > 0 ? (
+                    myReportedJobs.map((report) => (
+                      <div key={report._id} className="p-3 rounded-lg border border-border">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <p className="text-sm font-medium truncate">{report.jobId?.role || "Job"}</p>
+                          <Badge variant={reportStatusVariant(report.status)} className="capitalize">{report.status}</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">{report.jobId?.startupId?.startupName || "Startup"}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Reason: {report.reason}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-center text-muted-foreground text-sm p-2">No reported jobs yet.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
 
@@ -469,9 +575,14 @@ export default function StudentDashboard() {
                   className="cursor-pointer"
                 >
                   <CardContent className="p-5">
-                    <Badge variant={job.jobType === "Internship" ? "accent" : "success"} className="mb-3">
-                      {job.jobType}
-                    </Badge>
+                    <div className="flex items-center justify-between mb-3">
+                      <Badge variant={job.jobType === "Internship" ? "accent" : "success"}>
+                        {job.jobType}
+                      </Badge>
+                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={(event) => openReportDialog(job, event)}>
+                        <Flag className="h-3 w-3 mr-1" /> Report
+                      </Button>
+                    </div>
                     <h3 className="font-semibold text-lg mb-1">{job.role}</h3>
                     <p className="text-muted-foreground text-sm mb-4">{job.startup.startupName}</p>
                     <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
@@ -491,6 +602,54 @@ export default function StudentDashboard() {
           </div>
         </div>
       </div>
+
+      <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Report Job</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm">Job</Label>
+              <p className="text-sm text-muted-foreground mt-1">{selectedJobForReport?.role || "Role"} at {selectedJobForReport?.startup?.startupName || "Startup"}</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="report-reason">Reason</Label>
+              <Select value={reportReason} onValueChange={setReportReason}>
+                <SelectTrigger id="report-reason">
+                  <SelectValue placeholder="Select reason" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Spam">Spam</SelectItem>
+                  <SelectItem value="Inappropriate content">Inappropriate content</SelectItem>
+                  <SelectItem value="Fake company">Fake company</SelectItem>
+                  <SelectItem value="Misleading salary">Misleading salary</SelectItem>
+                  <SelectItem value="Scam or fraud">Scam or fraud</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="report-details">Details (optional)</Label>
+              <Textarea
+                id="report-details"
+                value={reportDetails}
+                onChange={(event) => setReportDetails(event.target.value)}
+                placeholder="Share details to help moderation review quickly."
+                rows={4}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReportDialogOpen(false)} disabled={submittingReport}>Cancel</Button>
+            <Button onClick={handleReportSubmit} disabled={submittingReport}>{submittingReport ? "Submitting..." : "Submit Report"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </StudentLayout>
   );
 }

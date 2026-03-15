@@ -10,12 +10,11 @@ import {
   Image,
   Video,
   FileText,
-  User,
   Loader2,
 } from "lucide-react";
 import { postService, Post } from "@/services/postService";
 import { API_BASE_URL } from "@/lib/api";
-import { StartupLayout } from "@/components/layouts/StartupLayout";
+import { AdminLayout } from "@/components/layouts/AdminLayout";
 import {
   Card,
   CardContent,
@@ -59,7 +58,7 @@ const getCommentAuthorInitials = (comment: any) => {
     .toUpperCase();
 };
 
-export default function PostDetailPage() {
+export default function IncubatorPostDetailPage() {
   const { postId } = useParams();
   const navigate = useNavigate();
   const [post, setPost] = useState<Post | null>(null);
@@ -86,17 +85,17 @@ export default function PostDetailPage() {
 
   if (loading) {
     return (
-        <StartupLayout>
-            <div className="flex bg-background h-[calc(100vh-4rem)] items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-accent" />
-            </div>
-        </StartupLayout>
-    )
+      <AdminLayout>
+        <div className="flex bg-background h-[calc(100vh-4rem)] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-accent" />
+        </div>
+      </AdminLayout>
+    );
   }
 
   if (!post) {
     return (
-      <StartupLayout>
+      <AdminLayout>
         <div className="flex flex-col items-center justify-center py-20 space-y-4">
           <p className="text-lg text-muted-foreground">Post not found</p>
           <Button variant="outline" onClick={() => navigate(-1)}>
@@ -104,7 +103,7 @@ export default function PostDetailPage() {
             Go Back
           </Button>
         </div>
-      </StartupLayout>
+      </AdminLayout>
     );
   }
 
@@ -114,9 +113,8 @@ export default function PostDetailPage() {
   const updated = post.updatedAt ? new Date(post.updatedAt) : created;
 
   return (
-    <StartupLayout>
+    <AdminLayout>
       <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
-        {/* Back button */}
         <Button
           variant="ghost"
           size="sm"
@@ -124,10 +122,9 @@ export default function PostDetailPage() {
           className="gap-2"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to Analysis
+          Back to Saved Posts
         </Button>
 
-        {/* Title & Type */}
         <div className="space-y-2">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-bold">{post.title}</h1>
@@ -150,7 +147,7 @@ export default function PostDetailPage() {
             {post.updatedAt !== post.createdAt && (
               <span className="flex items-center gap-1">
                 <CalendarDays className="h-3.5 w-3.5" />
-                Updated{" "}
+                Updated {" "}
                 {updated.toLocaleDateString("en-US", {
                   month: "short",
                   day: "numeric",
@@ -160,7 +157,6 @@ export default function PostDetailPage() {
           </div>
         </div>
 
-        {/* Media */}
         {post.media?.photo && (
           <Card className="overflow-hidden">
             <img
@@ -186,7 +182,6 @@ export default function PostDetailPage() {
           </Card>
         )}
 
-        {/* Description */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -201,7 +196,6 @@ export default function PostDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Engagement Stats */}
         <div className="grid grid-cols-3 gap-4">
           <Card>
             <CardContent className="pt-6 text-center">
@@ -226,7 +220,6 @@ export default function PostDetailPage() {
           </Card>
         </div>
 
-        {/* Comments Section */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -276,11 +269,9 @@ export default function PostDetailPage() {
           </CardContent>
         </Card>
       </div>
-    </StartupLayout>
+    </AdminLayout>
   );
 }
-
-/* ---- Sub-components ---- */
 
 function PostTypeBadge({ type }: { type: "photo" | "video" | "text" }) {
   const config = {

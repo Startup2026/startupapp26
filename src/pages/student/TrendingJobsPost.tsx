@@ -53,7 +53,7 @@ export default function TrendingJobsPage() {
       setLoading(true);
       try {
         const endpoint = user?._id 
-          ? `/recommendations/trending/jobs?limit=10&page=${page}` 
+          ? `/recommendations/trending/jobs?limit=10&page=${page}&userId=${user._id}` 
           : `/recommendations/cold-start?type=trending-jobs&limit=10&page=${page}`;
         
         const res = await apiFetch(endpoint);

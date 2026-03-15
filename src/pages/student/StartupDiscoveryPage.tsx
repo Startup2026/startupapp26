@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { apiFetch, getStoredUser, API_BASE_URL } from "@/lib/api";
+import { resolveMediaUrl } from "@/lib/media";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -127,7 +128,7 @@ export default function StartupDiscoveryPage() {
     return {
       id: item._id,
       name: item.startupName || "Startup",
-      logo: item.profilepic ? `${BASE_URL}${item.profilepic}` : "",
+      logo: resolveMediaUrl(BASE_URL, item.profilepic),
       domain: item.industry || "General",
       location: locationStr,
       tagline: item.tagline || "Building the future",

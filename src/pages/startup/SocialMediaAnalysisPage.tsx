@@ -176,6 +176,7 @@ export default function SocialMediaAnalysisPage() {
         likes: p.likes?.length || 0,
         comments: p.comments?.length || 0,
         engagement: (p.likes?.length || 0) + (p.comments?.length || 0),
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         type: getPostType(p),
         thumbnail: p.media?.photo,
@@ -185,6 +186,7 @@ export default function SocialMediaAnalysisPage() {
     // Post type performance
     const typeMap: Record<string, { total: number; count: number }> = {};
     posts.forEach((p) => {
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore
       const type = getPostType(p);
       if (!typeMap[type]) typeMap[type] = { total: 0, count: 0 };

@@ -25,6 +25,7 @@ import {
   Eye,
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api";
+import { resolveMediaUrl } from "@/lib/media";
 
 export default function StartupProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -101,7 +102,7 @@ export default function StartupProfilePage() {
             <div className="flex flex-col md:flex-row gap-6">
               <Avatar className="h-24 w-24 rounded-xl border-2 border-border">
                 <AvatarImage 
-                  src={startup.profilepic ? `${BASE_URL}${startup.profilepic}` : undefined} 
+                  src={resolveMediaUrl(BASE_URL, startup.profilepic) || undefined}
                   alt={startup.startupName} 
                   className="object-cover" 
                 />

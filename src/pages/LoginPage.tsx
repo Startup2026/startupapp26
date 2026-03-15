@@ -197,6 +197,16 @@ export default function LoginPage() {
               Create an account
             </button>
           </p>
+
+          <p className="mt-3 text-center text-xs text-muted-foreground">
+            Admin access?{" "}
+            <button
+              onClick={() => navigate("/admin/login")}
+              className="text-accent hover:text-accent/80 font-medium transition-colors"
+            >
+              Go to admin login
+            </button>
+          </p>
         </div>
       </div>
     </div>

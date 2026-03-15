@@ -29,6 +29,7 @@ const PLANS = [
   {
     name: "SPRINT_3MO",
     title: "Sprint · 3 Months",
+    originalPrice: "₹1,999",
     price: "₹999",
     billing: "One-time · 3 months",
     icon: <Rocket className="h-5 w-5 text-blue-500" />,
@@ -36,6 +37,7 @@ const PLANS = [
   {
     name: "BUILDER_6MO",
     title: "Builder · 6 Months",
+    originalPrice: "₹2,999",
     price: "₹1,999",
     billing: "Most popular · 6 months",
     icon: <Zap className="h-5 w-5 text-amber-500" />,
@@ -43,7 +45,8 @@ const PLANS = [
   {
     name: "PARTNER_12MO",
     title: "Partner · 12 Months",
-    price: "₹2,999",
+    originalPrice: "₹4,999",
+    price: "₹3,999",
     billing: "Year-long hiring",
     icon: <Shield className="h-5 w-5 text-purple-500" />,
   },
@@ -106,6 +109,8 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, fea
                 <div className="flex justify-between items-start">
                   <div className="p-2 bg-secondary rounded-lg">{plan.icon}</div>
                   <div className="text-right">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-green-600">Launching Discount</p>
+                    <p className="text-xs text-muted-foreground line-through">{plan.originalPrice}</p>
                     <span className="text-xl font-bold">{plan.price}</span>
                     <p className="text-xs text-muted-foreground">{plan.billing}</p>
                   </div>

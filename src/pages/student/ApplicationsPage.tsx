@@ -21,10 +21,11 @@ import {
   XCircle,
   ChevronRight,
 } from "lucide-react";
-import { apiFetch, getStoredUser } from "@/lib/api";
+import { apiFetch, getStoredUser, API_BASE_URL } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSocket } from "@/contexts/SocketContext";
 import { useToast } from "@/hooks/use-toast";
+import { resolveMediaUrl } from "@/lib/media";
 
 type ApplicationStatus = "applied" | "shortlisted" | "rejected" | "selected" | "interview" | "all";
 
@@ -77,6 +78,7 @@ const statusConfig: any = {
 };
 
 export default function ApplicationsPage() {
+  const BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ApplicationStatus>("all");
   const [applications, setApplications] = useState<Application[]>([]);
@@ -328,7 +330,7 @@ export default function ApplicationsPage() {
                       {app.resumeUrl && (
                         <Button variant="link" size="sm" className="h-auto p-0 text-accent" asChild>
                           <a 
-                            href={app.resumeUrl.startsWith('http') ? app.resumeUrl : `http://localhost:3000${app.resumeUrl}`} 
+                            href={resolveMediaUrl(BASE_URL, app.resumeUrl)}
                             target="_blank" 
                             rel="noopener noreferrer"
                           >

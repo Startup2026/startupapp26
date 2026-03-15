@@ -152,8 +152,10 @@ export default function SavedItemsPage() {
             {loading ? (
               <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-accent" /></div>
             ) : savedPosts.length > 0 ? (
-              savedPosts.map((post) => (
-                <Card key={post._id} className="hover:border-accent/40 transition-colors">
+              savedPosts.map((post) => {
+                const postId = post.contentId || post.postId || post._id || post.id;
+                return (
+                <Card key={postId} className="hover:border-accent/40 transition-colors">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-3">
@@ -181,11 +183,12 @@ export default function SavedItemsPage() {
                           <span className="flex items-center gap-1 text-xs"><Heart className="h-3 w-3" /> {post.likes}</span>
                           <span className="flex items-center gap-1 text-xs"><MessageCircle className="h-3 w-3" /> {post.comments?.length || 0}</span>
                        </div>
-                       <Button variant="ghost" size="sm" onClick={() => navigate(`/student/feed`)}>View in Feed</Button>
+                       <Button variant="ghost" size="sm" onClick={() => navigate(`/student/posts/${postId}`)}>View Post</Button>
                     </div>
                   </CardContent>
                 </Card>
-              ))
+                );
+              })
             ) : (
               <EmptyState message="No saved posts yet." />
             )}

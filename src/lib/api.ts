@@ -1,9 +1,8 @@
 // src/lib/api.ts
 
-// export const API_BASE_URL = 'http://localhost:3000/api';
-// export const API_BASE_URL = 'https://backend-f3js.onrender.com/api';
-export const API_BASE_URL = 'http://localhost:3000/api';
-// export const API_BASE_URL = 'https://rest.wostup.tech/api';
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+
+export const API_BASE_URL = (configuredApiBaseUrl || '/api').replace(/\/$/, '');
 
 export const getAuthToken = (): string | null => {
   return localStorage.getItem('auth_token');
@@ -31,7 +30,7 @@ export const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
   const token = getAuthToken();
   
   // Define routes that don't require authentication
-  const publicRoutes = ['/auth/signup', '/auth/verify-email', '/auth/resend-verification', '/auth/login'];
+  const publicRoutes = ['/auth/signup', '/auth/verify-email', '/auth/resend-verification', '/auth/login', '/auth/admin-login'];
   const isPublic = publicRoutes.some(route => endpoint.includes(route));
 
   if (!token && !isPublic) {

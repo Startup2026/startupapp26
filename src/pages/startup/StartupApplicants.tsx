@@ -40,6 +40,8 @@ import { startupProfileService } from "@/services/startupProfileService";
 import { jobService } from "@/services/jobService";
 import { applicationService } from "@/services/applicationService";
 import { format } from "date-fns";
+import { API_BASE_URL } from "@/lib/api";
+import { resolveMediaUrl } from "@/lib/media";
 
 /* ---------------- Types ---------------- */
 
@@ -66,6 +68,7 @@ interface Application {
 }
 
 export default function StartupApplicants() {
+  const BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -300,7 +303,7 @@ export default function StartupApplicants() {
                         {selectedApplicant.resumeUrl && (
                              <Button className="w-full sm:w-auto" asChild>
                                  <a 
-                                    href={selectedApplicant.resumeUrl.startsWith('http') ? selectedApplicant.resumeUrl : `http://localhost:3000${selectedApplicant.resumeUrl}`} 
+                                  href={resolveMediaUrl(BASE_URL, selectedApplicant.resumeUrl)}
                                     target="_blank" 
                                     rel="noopener noreferrer"
                                  >

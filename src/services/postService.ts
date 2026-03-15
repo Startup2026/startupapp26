@@ -12,6 +12,7 @@ export interface Post {
   likes: string[];
   comments: any[];
   createdAt: string;
+  updatedAt?: string;
 }
 
 export const postService = {

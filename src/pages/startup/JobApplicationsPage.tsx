@@ -36,8 +36,11 @@ import { StatusBadge } from "@/components/startup/StatusBadge";
 import { applicationService, Application } from "@/services/applicationService";
 import { jobService, Job } from "@/services/jobService";
 import { format } from "date-fns";
+import { API_BASE_URL } from "@/lib/api";
+import { resolveMediaUrl } from "@/lib/media";
 
 export default function JobApplicationsPage() {
+  const BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
   const { jobId } = useParams();
   const [atsEnabled, setAtsEnabled] = useState(true);
   const [applicants, setApplicants] = useState<Applicant[]>([]);
@@ -353,7 +356,7 @@ export default function JobApplicationsPage() {
                   {selectedApplicant.resumeUrl && (
                     <Button variant="outline" asChild>
                       <a 
-                        href={selectedApplicant.resumeUrl.startsWith('http') ? selectedApplicant.resumeUrl : `http://localhost:3000${selectedApplicant.resumeUrl}`} 
+                        href={resolveMediaUrl(BASE_URL, selectedApplicant.resumeUrl)}
                         target="_blank" 
                         rel="noopener noreferrer"
                       >

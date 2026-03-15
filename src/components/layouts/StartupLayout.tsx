@@ -16,7 +16,9 @@ import {
   BarChart3,
   Calendar,
   Clock,
-  TrendingUp
+  TrendingUp,
+  Rss,
+  Bookmark
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -44,6 +46,9 @@ import { startupProfileService } from "@/services/startupProfileService";
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/startup/dashboard" },
   { icon: Briefcase, label: "Jobs", href: "/startup/jobs" },
+  { icon: TrendingUp, label: "Trending", href: "/startup/trending" },
+  { icon: Rss, label: "Feed", href: "/startup/feed" },
+  { icon: Bookmark, label: "Saved", href: "/startup/saved" },
   // { icon: Users, label: "Applicants", href: "/startup/applicants" },
   // New Sections Added Below
   { icon: UserCheck, label: "Shortlisted", href: "/startup/shortlisted" },
