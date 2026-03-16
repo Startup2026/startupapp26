@@ -243,7 +243,7 @@ export function StartupLayout({ children }: { children: ReactNode }) {
         <div className="p-6">
           <Logo size="sm" variant="light" />
         </div>
-        <div className="flex-1 px-4 overflow-y-auto">
+        <div className="flex-1 min-h-0 px-4 overflow-y-auto">
           <NavLinks />
         </div>
         <div className="p-4 border-t border-sidebar-border">
@@ -267,14 +267,14 @@ export function StartupLayout({ children }: { children: ReactNode }) {
                   <Menu className="h-6 w-6" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[280px] p-0 bg-sidebar text-sidebar-foreground border-r-0">
+              <SheetContent side="left" className="w-[280px] p-0 bg-sidebar text-sidebar-foreground border-r-0 flex h-full flex-col">
                 <div className="p-6 border-b border-sidebar-border">
                   <Logo size="sm" variant="light" />
                 </div>
-                <div className="px-4 py-6">
+                <div className="flex-1 min-h-0 px-4 py-6 overflow-y-auto">
                   <NavLinks isMobile />
                 </div>
-                <div className="mt-auto p-4 border-t border-sidebar-border">
+                <div className="p-4 border-t border-sidebar-border shrink-0">
                   <Button 
                     onClick={handleLogout}
                     variant="ghost" 

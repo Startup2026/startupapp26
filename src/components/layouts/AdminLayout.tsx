@@ -259,7 +259,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           <Logo size="sm" />
         </div>
 
-        <div className="flex-1 px-4 overflow-y-auto">
+        <div className="flex-1 min-h-0 px-4 overflow-y-auto">
           <NavLinks />
         </div>
 
@@ -284,12 +284,25 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   <Menu className="h-6 w-6" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[280px] p-0 bg-sidebar text-sidebar-foreground border-r-0">
+              <SheetContent side="left" className="w-[280px] p-0 bg-sidebar text-sidebar-foreground border-r-0 flex h-full flex-col">
                 <div className="p-6 border-b border-sidebar-border">
                   <Logo size="sm" />
                 </div>
-                <div className="px-4 py-6">
+                <div className="flex-1 min-h-0 px-4 py-6 overflow-y-auto">
                   <NavLinks isMobile />
+                </div>
+                <div className="p-4 border-t border-sidebar-border shrink-0">
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-3 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                    onClick={() => {
+                      setOpen(false);
+                      logout();
+                    }}
+                  >
+                    <LogOut className="h-5 w-5" />
+                    <span>Sign out</span>
+                  </Button>
                 </div>
               </SheetContent>
             </Sheet>

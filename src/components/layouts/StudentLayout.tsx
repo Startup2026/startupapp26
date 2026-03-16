@@ -181,7 +181,7 @@ export function StudentLayout({ children }: { children: ReactNode }) {
         <div className="p-6">
           <Logo size="sm" variant="light" />
         </div>
-        <div className="flex-1 px-4 overflow-y-auto">
+        <div className="flex-1 min-h-0 px-4 overflow-y-auto">
           <NavLinks />
         </div>
         <div className="p-4 border-t border-sidebar-border space-y-1">
@@ -227,13 +227,14 @@ export function StudentLayout({ children }: { children: ReactNode }) {
                   <Menu className="h-6 w-6" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[280px] p-0 bg-sidebar text-sidebar-foreground border-r-0">
+              <SheetContent side="left" className="w-[280px] p-0 bg-sidebar text-sidebar-foreground border-r-0 flex h-full flex-col">
                 <div className="p-6 border-b border-sidebar-border">
                   <Logo size="sm" variant="light" />
                 </div>
-                <div className="px-4 py-6 flex flex-col h-[calc(100vh-80px)]">
+                <div className="flex-1 min-h-0 px-4 py-6 overflow-y-auto">
                   <NavLinks isMobile />
-                  <div className="mt-auto pt-6 border-t border-sidebar-border space-y-1">
+                </div>
+                <div className="p-4 border-t border-sidebar-border space-y-1 shrink-0">
                     <Link to="/student/profile" onClick={() => setOpen(false)}>
                       <Button variant="ghost" className={cn(
                         "w-full justify-start gap-3 transition-all duration-200 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50",
@@ -263,7 +264,6 @@ export function StudentLayout({ children }: { children: ReactNode }) {
                       <LogOut className="h-5 w-5" />
                       <span>Sign out</span>
                     </Button>
-                  </div>
                 </div>
               </SheetContent>
             </Sheet>
