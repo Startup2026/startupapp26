@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api";
 import { resolveMediaUrl } from "@/lib/media";
+import { normalizeExternalUrl } from "@/lib/utils";
 
 export default function StartupProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -138,12 +139,12 @@ export default function StartupProfilePage() {
                 <div className="flex flex-wrap gap-2 pt-2">
                   {startup.website && (
                     <Button variant="outline" size="sm" asChild>
-                      <a href={startup.website} target="_blank" rel="noreferrer"><Globe className="h-4 w-4 mr-2" /> Website</a>
+                      <a href={normalizeExternalUrl(startup.website)} target="_blank" rel="noreferrer"><Globe className="h-4 w-4 mr-2" /> Website</a>
                     </Button>
                   )}
                   {startup.socialLinks?.linkedin && (
                     <Button variant="outline" size="sm" asChild>
-                      <a href={startup.socialLinks.linkedin} target="_blank" rel="noreferrer"><Linkedin className="h-4 w-4 mr-2" /> LinkedIn</a>
+                      <a href={normalizeExternalUrl(startup.socialLinks.linkedin)} target="_blank" rel="noreferrer"><Linkedin className="h-4 w-4 mr-2" /> LinkedIn</a>
                     </Button>
                   )}
                 </div>

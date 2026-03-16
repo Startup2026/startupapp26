@@ -5,6 +5,29 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export function normalizeExternalUrl(url?: string | null): string {
+  const raw = (url || "").trim();
+  if (!raw) return "";
+
+  if (/^https?:\/\//i.test(raw)) return raw;
+
+  if (/^https?\/\//i.test(raw)) {
+    return raw.replace(/^https?\/\//i, (value) =>
+      value.toLowerCase().startsWith("https") ? "https://" : "http://"
+    );
+  }
+
+  if (/^https?:/i.test(raw)) {
+    return raw.replace(/^https?:/i, (value) =>
+      value.toLowerCase().startsWith("https") ? "https://" : "http://"
+    );
+  }
+
+  if (/^[a-z][a-z\d+\-.]*:/i.test(raw)) return raw;
+
+  return `https://${raw}`;
+}
+
 export function calculateProfileCompletion(profile: any) {
   if (!profile) return 0;
   let score = 0;

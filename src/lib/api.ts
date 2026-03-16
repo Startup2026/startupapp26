@@ -1,9 +1,28 @@
 // src/lib/api.ts
 
 const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
-const defaultApiBaseUrl = import.meta.env.PROD ? 'https://rest.wostup.com/api' : '/api';
+const defaultApiBaseUrl = import.meta.env.PROD
+  ? 'https://rest.wostup.com/api'
+  : 'http://localhost:3000/api';
 
-export const API_BASE_URL = (configuredApiBaseUrl || defaultApiBaseUrl).replace(/\/$/, '');
+const resolveApiBaseUrl = (): string => {
+  if (!configuredApiBaseUrl) return defaultApiBaseUrl;
+
+  // Keep explicit absolute URLs as-is.
+  if (/^https?:\/\//i.test(configuredApiBaseUrl)) {
+    return configuredApiBaseUrl;
+  }
+
+  // In dev, map relative '/api' style config to backend origin.
+  if (configuredApiBaseUrl.startsWith('/')) {
+    const devBackendOrigin = import.meta.env.VITE_DEV_BACKEND_ORIGIN?.trim() || 'http://localhost:3000';
+    return `${devBackendOrigin.replace(/\/$/, '')}${configuredApiBaseUrl}`;
+  }
+
+  return configuredApiBaseUrl;
+};
+
+export const API_BASE_URL = resolveApiBaseUrl().replace(/\/$/, '');
 
 export const getAuthToken = (): string | null => {
   return localStorage.getItem('auth_token');

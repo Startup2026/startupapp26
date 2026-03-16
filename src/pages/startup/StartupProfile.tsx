@@ -22,6 +22,7 @@ import { StartupLayout } from "@/components/layouts/StartupLayout";
 import { startupProfileService, StartupProfile as IStartupProfile } from "@/services/startupProfileService";
 import { toast } from "@/hooks/use-toast";
 import { EditStartupProfileModal } from "@/components/startup/EditStartupProfileModal";
+import { normalizeExternalUrl } from "@/lib/utils";
 
 export default function StartupProfilePage() {
   const [profile, setProfile] = useState<IStartupProfile | null>(null);
@@ -135,7 +136,7 @@ export default function StartupProfilePage() {
               </div>
               {profile.website && (
                 <a
-                    href={profile.website}
+                    href={normalizeExternalUrl(profile.website)}
                     target="_blank"
                     rel="noreferrer"
                     className="flex items-center gap-2 text-teal-600 hover:underline"
@@ -180,7 +181,7 @@ export default function StartupProfilePage() {
 
                     <div className="flex gap-3 text-muted-foreground">
                       {member.linkedInUrl && (
-                        <a href={member.linkedInUrl} target="_blank" rel="noreferrer">
+                        <a href={normalizeExternalUrl(member.linkedInUrl)} target="_blank" rel="noreferrer">
                           <Linkedin className="h-4 w-4 hover:text-teal-600" />
                         </a>
                       )}

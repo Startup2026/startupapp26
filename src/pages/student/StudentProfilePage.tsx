@@ -28,7 +28,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
 import { studentProfileService, StudentProfile } from "@/services/studentProfileService";
 import { useAuth } from "@/contexts/AuthContext";
-import { calculateProfileCompletion } from "@/lib/utils";
+import { calculateProfileCompletion, normalizeExternalUrl } from "@/lib/utils";
 
 const initialProfile = {
   firstName: "",
@@ -60,6 +60,11 @@ export default function StudentProfilePage() {
   const [editedProfile, setEditedProfile] = useState(initialProfile);
   const [newSkill, setNewSkill] = useState("");
   const [newInterest, setNewInterest] = useState("");
+  const [experienceDraft, setExperienceDraft] = useState({
+    title: "",
+    company: "",
+    duration: "",
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [profilepicFile, setProfilepicFile] = useState<File | null>(null);
@@ -219,6 +224,35 @@ export default function StudentProfilePage() {
     setEditedProfile({
       ...editedProfile,
       interests: editedProfile.interests.filter((i) => i !== interest),
+    });
+  };
+
+  const addExperience = () => {
+    const title = experienceDraft.title.trim();
+    const company = experienceDraft.company.trim();
+    const duration = experienceDraft.duration.trim();
+    if (!title || !company) return;
+
+    setEditedProfile({
+      ...editedProfile,
+      experience: [
+        ...editedProfile.experience,
+        {
+          id: Date.now(),
+          title,
+          company,
+          duration,
+        },
+      ],
+    });
+
+    setExperienceDraft({ title: "", company: "", duration: "" });
+  };
+
+  const removeExperience = (id: number) => {
+    setEditedProfile({
+      ...editedProfile,
+      experience: editedProfile.experience.filter((exp) => exp.id !== id),
     });
   };
 
@@ -420,7 +454,7 @@ export default function StudentProfilePage() {
                   <div className="space-y-3">
                     {currentProfile.links.github && (
                       <a
-                        href={`https://${currentProfile.links.github}`}
+                        href={normalizeExternalUrl(currentProfile.links.github)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
@@ -431,7 +465,7 @@ export default function StudentProfilePage() {
                     )}
                     {currentProfile.links.linkedin && (
                       <a
-                        href={`https://${currentProfile.links.linkedin}`}
+                        href={normalizeExternalUrl(currentProfile.links.linkedin)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
@@ -442,7 +476,7 @@ export default function StudentProfilePage() {
                     )}
                     {currentProfile.links.portfolio && (
                       <a
-                        href={`https://${currentProfile.links.portfolio}`}
+                        href={normalizeExternalUrl(currentProfile.links.portfolio)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
@@ -705,13 +739,39 @@ export default function StudentProfilePage() {
                   Experience
                 </CardTitle>
                 {isEditing && (
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" onClick={addExperience}>
                     <Plus className="h-4 w-4 mr-1" />
                     Add Experience
                   </Button>
                 )}
               </CardHeader>
               <CardContent>
+                {isEditing && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
+                    <Input
+                      placeholder="Role/Title"
+                      value={experienceDraft.title}
+                      onChange={(e) => setExperienceDraft({ ...experienceDraft, title: e.target.value })}
+                    />
+                    <Input
+                      placeholder="Company"
+                      value={experienceDraft.company}
+                      onChange={(e) => setExperienceDraft({ ...experienceDraft, company: e.target.value })}
+                    />
+                    <Input
+                      placeholder="Duration (optional)"
+                      value={experienceDraft.duration}
+                      onChange={(e) => setExperienceDraft({ ...experienceDraft, duration: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addExperience();
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+
                 {currentProfile.experience.length > 0 ? (
                   <div className="space-y-4">
                     {currentProfile.experience.map((exp) => (
@@ -725,8 +785,8 @@ export default function StudentProfilePage() {
                           <p className="text-sm text-muted-foreground">{exp.duration}</p>
                         </div>
                         {isEditing && (
-                          <Button variant="ghost" size="icon">
-                            <Edit2 className="h-4 w-4" />
+                          <Button variant="ghost" size="icon" onClick={() => removeExperience(exp.id)}>
+                            <X className="h-4 w-4" />
                           </Button>
                         )}
                       </div>

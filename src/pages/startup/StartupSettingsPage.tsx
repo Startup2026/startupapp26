@@ -11,6 +11,7 @@ import { toast } from "@/hooks/use-toast";
 import { User, Lock, Bell, Building, Globe, Shield, Loader2, Save } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { startupProfileService } from "@/services/startupProfileService";
+import { normalizeExternalUrl } from "@/lib/utils";
 
 export default function StartupSettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -184,7 +185,7 @@ export default function StartupSettingsPage() {
                             onChange={(e) => setProfile({...profile, website: e.target.value})}
                         />
                         <Button variant="outline" size="icon" asChild>
-                            <a href={profile?.website} target="_blank" rel="noreferrer"><Globe className="h-4 w-4" /></a>
+                          <a href={normalizeExternalUrl(profile?.website)} target="_blank" rel="noreferrer"><Globe className="h-4 w-4" /></a>
                         </Button>
                     </div>
                   </div>
