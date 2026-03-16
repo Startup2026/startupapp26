@@ -1,7 +1,7 @@
 // src/lib/api.ts
 
 const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
-const defaultApiBaseUrl = import.meta.env.PROD ? 'https://wostup.com/api' : '/api';
+const defaultApiBaseUrl = import.meta.env.PROD ? 'https://rest.wostup.com/api' : '/api';
 
 export const API_BASE_URL = (configuredApiBaseUrl || defaultApiBaseUrl).replace(/\/$/, '');
 
