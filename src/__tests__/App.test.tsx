@@ -6,6 +6,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { SocketProvider } from '@/contexts/SocketContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { describe, test, expect } from 'vitest';
 
 describe('<App /> Component', () => {
     test('renders main App wrapped with Providers', () => {

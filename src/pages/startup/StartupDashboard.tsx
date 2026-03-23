@@ -36,6 +36,7 @@ import { usePlanAccess } from "@/hooks/usePlanAccess";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { formatDistanceToNow } from "date-fns";
 import { resolveMediaUrl } from "@/lib/media";
+import { DashboardToggle } from "@/components/startup/DashboardToggle";
 
 interface DashboardRecommendationPost {
   _id: string;
@@ -83,7 +84,7 @@ export default function StartupDashboard() {
     const fetchData = async () => {
       if (planLoading) return;
       try {
-        const recommendationUserId = user?._id || user?.id;
+        const recommendationUserId = user?._id
         const [
           profileResult,
           jobsResult,
@@ -286,6 +287,12 @@ export default function StartupDashboard() {
                 Welcome back! Here's your hiring overview.
               </p>
             </div>
+             {profile && (
+              <DashboardToggle
+                initialDashboard={profile.dashboardType || 'hiring'}
+                hasRecruiterPlan={profile.hasRecruiterPlan || false}
+              />
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Button

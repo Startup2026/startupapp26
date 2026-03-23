@@ -82,6 +82,7 @@ interface StartupProfileFormData {
   incubationCode: string;
   affiliatedIncubatorName: string;
   incubatorVerified: boolean;
+  wantsRecruiterPlan: boolean;
 }
 
 const CURRENT_YEAR = new Date().getFullYear().toString();
@@ -136,6 +137,7 @@ const CreateStartupProfilePage = () => {
     incubationCode: "",
     affiliatedIncubatorName: "",
     incubatorVerified: false,
+    wantsRecruiterPlan: false,
   });
 
   useEffect(() => {
@@ -210,6 +212,7 @@ const CreateStartupProfilePage = () => {
              incubationCode: prev.incubationCode,
              affiliatedIncubatorName,
              incubatorVerified: (p as any).incubator_verified ?? prev.incubatorVerified,
+             wantsRecruiterPlan: (p as any).hasRecruiterPlan ?? prev.wantsRecruiterPlan,
           }));
         }
       } catch (err) {
@@ -258,6 +261,7 @@ const CreateStartupProfilePage = () => {
 
     try {
       const toNumber = (value: string) => (value ? Number(value) : undefined);
+      const { affiliatedIncubatorName } = formData;
 
       if (formData.incubator_claimed && !hasLockedIncubator && !formData.incubationCode.trim()) {
         toast({
@@ -325,6 +329,9 @@ const CreateStartupProfilePage = () => {
         // Incubation Data
         incubator_claimed: formData.incubator_claimed,
         incubationCode: formData.incubator_claimed ? formData.incubationCode.trim() || undefined : undefined,
+        affiliatedIncubatorName,
+        incubatorVerified: formData.incubatorVerified,
+        wantsRecruiterPlan: formData.wantsRecruiterPlan,
       };
 
       console.log("Submitting Profile Data:", {
@@ -998,19 +1005,12 @@ const CreateStartupProfilePage = () => {
                     checked={formData.owns_proprietary_product}
                     onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, owns_proprietary_product: !!checked }))}
                   />
-                  <Label htmlFor="owns_proprietary_product" className="cursor-pointer">Do you own a proprietary product?</Label>
+                  <Label htmlFor="owns_proprietary_product" className="cursor-pointer">Do you own a proprietary product/service?</Label>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="product_url">Product URL (If any)</Label>
-                  <Input
-                    id="product_url"
-                    name="product_url"
-                    type="url"
-                    value={formData.product_url}
-                    onChange={handleChange}
-                    placeholder="https://..."
-                  />
+                  <Label htmlFor="product_url">Product URL</Label>
+                  <Input id="product_url" name="product_url" type="url" value={formData.product_url} onChange={handleChange} />
                 </div>
 
                 <div className="space-y-2">
@@ -1034,81 +1034,50 @@ const CreateStartupProfilePage = () => {
                     checked={formData.primarily_service_based}
                     onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, primarily_service_based: !!checked }))}
                   />
-                  <Label htmlFor="primarily_service_based" className="cursor-pointer">Are you primarily a service-based agency?</Label>
+                  <Label htmlFor="primarily_service_based" className="cursor-pointer">Is your startup primarily service-based?</Label>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="product_description">Product Description</Label>
-                  <Textarea
-                    id="product_description"
-                    name="product_description"
-                    value={formData.product_description}
-                    onChange={handleChange}
-                    placeholder="Briefly describe your product"
-                  />
+                  <Textarea id="product_description" name="product_description" value={formData.product_description} onChange={handleChange} rows={3} />
                 </div>
-
               </CardContent>
             </Card>
 
-            {/* Incubation details */}
+            {/* Recruiter Plan */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Building className="h-5 w-5 text-accent" />
-                  Incubation Information
+                  <Users className="h-5 w-5 text-accent" />
+                  Recruiter Plan
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent>
                 <div className="flex items-center gap-2 pt-2">
                   <Checkbox
-                    id="incubator_claimed"
-                    checked={formData.incubator_claimed}
-                    disabled={hasLockedIncubator}
-                    onCheckedChange={(checked) => setFormData((prev) => ({
-                      ...prev,
-                      incubator_claimed: !!checked,
-                      incubationCode: checked ? prev.incubationCode : "",
-                    }))}
+                    id="wantsRecruiterPlan"
+                    checked={formData.wantsRecruiterPlan}
+                    onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, wantsRecruiterPlan: !!checked }))}
                   />
-                  <Label htmlFor="incubator_claimed" className="cursor-pointer">Do you have an incubation code from Wostup?</Label>
-                </div>
-
-                {formData.incubator_claimed && (
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="incubationCode">Incubation Code</Label>
-                      <Input
-                        id="incubationCode"
-                        name="incubationCode"
-                        value={formData.incubationCode}
-                        onChange={handleChange}
-                        placeholder="Enter the code emailed to your company"
-                        disabled={hasLockedIncubator}
-                      />
-                      <p className="text-sm text-muted-foreground">
-                        Your incubator creates this code from its dashboard, and Wostup sends it to your company email.
-                      </p>
-                    </div>
-
-                    {formData.affiliatedIncubatorName && (
-                      <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
-                        Linked incubator: <span className="font-medium text-foreground">{formData.affiliatedIncubatorName}</span>
-                      </div>
-                    )}
+                    <Label htmlFor="wantsRecruiterPlan" className="cursor-pointer">
+                      I want to opt-in for the Recruiter Plan to access advanced hiring features.
+                    </Label>
                   </div>
-                )}
-              </CardContent>
+                </CardContent>
             </Card>
 
             {/* Submit Button */}
             <Button type="submit" variant="hero" size="lg" className="w-full gap-2" disabled={isSubmitting}>
               {isSubmitting ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
+                <>
+                  <Loader2 className="h-5 w-5" />
+                  <span>Submitting...</span>
+                </>
               ) : (
-                <CheckCircle className="h-5 w-5" />
+                <>
+                  {existingProfileId ? "Update & Verify Profile" : "Complete Profile"}
+                </>
               )}
-              {isSubmitting ? "Submitting..." : (existingProfileId ? "Update & Verify Profile" : "Complete Profile")}
             </Button>
           </div>
         </form>

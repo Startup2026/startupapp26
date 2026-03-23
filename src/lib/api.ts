@@ -46,7 +46,7 @@ export const setStoredUser = (user: any): void => {
   localStorage.setItem('user', JSON.stringify(user));
 };
 
-export const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
+export const apiFetch = async <T>(endpoint: string, options: RequestInit = {}): Promise<{ success: boolean; data?: T; error?: string; status?: number }> => {
   const token = getAuthToken();
   
   // Define routes that don't require authentication
