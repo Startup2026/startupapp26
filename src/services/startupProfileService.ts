@@ -41,6 +41,8 @@ export interface StartupProfile {
   incubator?: string;
   incubator_claimed?: boolean;
   incubator_verified?: boolean;
+  hasRecruiterPlan?: boolean;
+  dashboardType?: 'hiring' | 'startuppage';
 }
 
 export interface CreateStartupProfileData {
@@ -86,6 +88,7 @@ export interface CreateStartupProfileData {
   incubatorId?: string;
   incubator?: string;
   incubationCode?: string;
+  wantsRecruiterPlan?: boolean;
 }
 
 export const startupProfileService = {
@@ -108,6 +111,16 @@ export const startupProfileService = {
     return apiFetch<StartupProfile>('/startupProfile/me');
   },
 
+  async toggleDashboard(): Promise<{ success: boolean; data?: { dashboardType: 'hiring' | 'startuppage' }; error?: string }> {
+    const result = await apiFetch<{ dashboardType: 'hiring' | 'startuppage' }>('/startup/toggle-dashboard', {
+      method: 'PUT',
+    });
+    if (result.success && result.data) {
+      return { success: true, data: result.data };
+    }
+    return { success: false, error: result.error || 'Failed to toggle dashboard' };
+  },
+
   async updateProfile(id: string, data: Partial<any>): Promise<{ success: boolean; data?: any; error?: string }> {
     return apiFetch<any>(`/startupProfile/${id}`, {
       method: 'PUT',
@@ -121,10 +134,14 @@ export const startupProfileService = {
     });
   },
 
-  async selectPlan(plan: PlanName): Promise<{ success: boolean; data?: any; error?: string }> {
-    return apiFetch('/startupProfile/select-plan', {
+  async selectPlan(plan: PlanName): Promise<{ success: boolean; data?: { message?: string }; error?: string }> {
+    const result = await apiFetch<{ message?: string }>('/startupProfile/select-plan', {
       method: 'POST',
       body: JSON.stringify({ plan }),
     });
+    if (result.success) {
+      return { success: true, data: result.data };
+    }
+    return { success: false, error: result.error || 'Failed to select plan' };
   },
 };
